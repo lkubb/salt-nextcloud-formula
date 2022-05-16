@@ -1,0 +1,69 @@
+{#-
+    This macro is actually a general-purpose renderer for (Nextcloud-style)
+    php configuration I wrote before realising using occ is a much
+    better idea. It also supports pretty-printed arbitrary nesting.
+    Fwiw, at least use it for autoconfig.php.
+-#}
+
+{%- macro render_val(val) %}
+{%-   if val in [true, false] -%}
+{{ val | string | lower }}
+{%-   elif val | int(-3) != -3 -%}
+{{ val }}
+{%-   elif val is string -%}
+'{{ val }}'
+{%-   elif val is mapping -%}
+[
+{%-     for name, value in val.items() %}
+{%-       set fmt = "{}" if "::" in name else "'{}'" %}
+  {{ fmt.format(name) }} => {{ render_val(value) | indent(2) }},
+{%-     endfor %}
+]
+{%-   elif val | is_list -%}
+[
+{%-     for value in val %}
+  {{ render_val(value) | indent(2) }},
+{%-     endfor %}
+]
+{%-   endif %}
+{%- endmacro -%}
+
+{#- Table prefixes are not supported by occ maintenance:install and
+    are unnecessary if you have a separate database for Nextcloud,
+    which should be the case almost everywhere. -#}
+
+{%- set config = {"dbtableprefix": ""} -%}
+
+{%- for param, name, dflt in [
+      ("database", "dbtype", "sqlite"),
+      ("dabase_name", "dbname", ""),
+      ("database_host", "dbhost", "localhost"),
+      ("database_user", "dbuser", "nextcloud"),
+      ("database_pass", "dbpass", ""),
+      ("admin_user", "adminlogin", "admin"),
+      ("admin_pass", "adminpass", ""),
+    ]
+-%}
+{%-   if nextcloud.setup_vars[param] or (nextcloud.web_install_use_defaults and dflt) -%}
+{%-     do config.update({name: nextcloud.setup_vars[param] or dflt}) -%}
+{%-   endif -%}
+{%- endfor -%}
+
+{#- Force a failure if the pillar value is unset. -#}
+{%- if nextcloud.setup_vars["database_pass_pillar"] -%}
+{%-   do config.update("dbpass": pillar[nextcloud.setup_vars["database_pass_pillar"]]) -%}
+{%- endif -%}
+
+{%- if nextcloud.setup_vars["admin_pass_pillar"] -%}
+{%-   do config.update("adminpass": pillar[nextcloud.setup_vars["admin_pass_pillar"]]) -%}
+{%- endif -%}
+
+{%- do config.update({"directory": nextcloud.lookup.datadir}) -%}
+
+<?php
+$AUTOCONFIG = [
+{%- for var, val in config.items() %}
+{%-       set fmt = "{}" if "::" in var else "'{}'" %}
+  {{ fmt.format(var) }} => {{ render_val(value) | indent(2) }},
+{%- endfor %}
+];

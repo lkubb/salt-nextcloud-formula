@@ -1,0 +1,88 @@
+# yamllint disable rule:indentation rule:line-length
+# Leap-15
+---
+values:
+  added_in_defaults: defaults_value
+  added_in_lookup: lookup_value
+  added_in_pillar: pillar_value
+  lookup:
+    arch: amd64
+    rootgroup: root
+    config: 'config/config.php'
+    service:
+      name: nextcloudcron
+    datadir: data
+    gpg:
+      fingerprint: 28806A878AE423A28372792ED75899B9A724937A
+      keyid: D75899B9A724937A
+      keyserver: attester.flowcrypt.com
+      official_src: https://nextcloud.com/nextcloud.asc
+      requirements:
+        - gpg
+        - python3-gnupg
+    group: www-data
+    pkg:
+      exact:
+        sig: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2.asc
+        source: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2
+        source_hash: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2.sha512
+      latest_major:
+        sig: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2.asc
+        source: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2
+        source_hash: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2.sha512
+    redis_group: redis
+    service:
+      name: nextcloudcron
+      unit: /etc/systemd/system/{name}.service
+      unit_timer: /etc/systemd/system/{name}.timer
+    user: www-data
+    webroot: /var/www/nextcloud
+  additional_groups: []
+  caching:
+    distributed: false
+    local: apcu
+    locking: false
+  config: {}
+  cron:
+    daemon: systemd
+    timer: 5
+  manage_groups_auto: true
+  required_states: []
+  setup_method: cli
+  setup_vars:
+    admin_pass: correct horse battery staple
+    admin_pass_pillar: ''
+    admin_user: admin
+    database: sqlite
+    database_host: ''
+    database_name: ''
+    database_pass: ''
+    database_pass_pillar: ''
+    database_user: ''
+  update_auto:
+    enabled: true
+    no_backup: false
+  version: latest
+  version_major: 24
+  web_install_use_defaults: false
+  map_jinja:
+    sources:
+    - Y:G@osarch
+    - Y:G@os_family
+    - Y:G@os
+    - Y:G@osfinger
+    - C@nextcloud
+    - Y:G@id
+  master: template-master
+  tofs:
+    files_switch:
+    - any/path/can/be/used/here
+    - id
+    - roles
+    - osfinger
+    - os
+    - os_family
+    source_files:
+      nextcloud-config-file-file-managed:
+      - example.tmpl.jinja
+  winner: pillar

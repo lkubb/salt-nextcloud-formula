@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Nextcloud cron.php every {{ nextcloud.cron.timer }} minutes
+
+[Timer]
+OnBootSec={{ nextcloud.cron.timer }}min
+OnUnitActiveSec={{ nextcloud.cron.timer }}min
+Unit={{ nextcloud.lookup.service.name }}.service
+
+[Install]
+WantedBy=timers.target

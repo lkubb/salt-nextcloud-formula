@@ -1,0 +1,11 @@
+[Unit]
+Description=Nextcloud cron.php job
+
+[Service]
+User={{ nextcloud.lookup.user }}
+ExecStart={{ salt["cmd.run_stdout"]("which php", runas=nextcloud.lookup.user) }} {%
+   if "apcu" == nextcloud.caching.local -%} --define apc.enable_cli=1 {% endif -%}
+-f '{{ nextcloud.lookup.webroot | path_join("cron.php") }}'
+KillMode=process
+
+# @TODO harden this
