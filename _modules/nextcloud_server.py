@@ -3023,7 +3023,7 @@ def update_check(webroot=None, webuser=None):
             )
         )
 
-    ret = {app: version for d in apps for app, version in d}
+    ret = {app: version for app, version in apps}
 
     if system:
         ret["Nextcloud"] = system[0]
