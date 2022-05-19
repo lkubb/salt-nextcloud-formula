@@ -9,9 +9,8 @@ with Salt, using ``occ`` and the inbuilt updater.
 import logging
 
 import salt.utils.dictdiffer
+import salt.utils.json
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-
-# import salt.utils.platform
 
 log = logging.getLogger(__name__)
 
@@ -361,19 +360,23 @@ def app_installed(
                 name, "enabled"
             )
 
-            # if the app is enabled for all users, set add_groups to
+            # If the app is enabled for all users, set add_groups to
             # groups. This covers both set and unset groups.
-            if not isinstance(current_groups, list):
+            if "yes" == current_groups:
                 add_groups = groups
             # If the app is restricted to certain groups and should be,
             # see if wanted and current state match
             elif groups:
+                # For some reason, the json output outputs a string
+                # that contains the list of groups in json format, not
+                # the list itself.
+                current_groups = salt.utils.json.loads(current_groups)
                 add_groups = set(groups) - set(current_groups)
                 del_groups = set(current_groups) - set(groups)
             # If the app is restricted to certain groups, but should
             # not be, make sure they are removed.
             else:
-                del_groups = current_groups
+                del_groups = salt.utils.json.loads(current_groups)
 
         elif enabled:
             add_groups = groups
