@@ -1824,11 +1824,13 @@ def files_scan(
     if home_only:
         flags.append("home-only")
 
+    # claims to provide json output, does not
     out = occ(
         "files:scan",
         arguments,
         parameters=params,
         flags=flags,
+        json=False,
         webroot=webroot,
         webuser=webuser,
     )
