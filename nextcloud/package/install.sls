@@ -17,10 +17,15 @@
 {%- set tmp_pkg = tmp_base | path_join(salt["file.basename"](pkg_src)) %}
 {%- set tmp_sig = tmp_base | path_join(salt["file.basename"](sig_src)) %}
 
-{%- if nextcloud.required_states %}
+{%- set is_installed =
+        salt["file.file_exists"](nextcloud.lookup.webroot | path_join("occ")) and
+        salt["nextcloud_server.is_installed"](webroot=nextcloud.lookup.webroot, webuser=nextcloud.lookup.user)
+%}
+
+{%- if nextcloud.required_states_preinstall and not is_installed %}
 
 include:
-{%-   for req in nextcloud.required_states %}
+{%-   for req in nextcloud.required_states_preinstall %}
   - {{ req }}
 {%-   endfor %}
 {%- endif %}
@@ -50,9 +55,11 @@ Nextcloud user is member of additional groups:
       - {{ nextcloud.lookup.user }}
     - require:
       - Nextcloud user/group are present
-{%-   for req in nextcloud.required_states %}
+{%-   if not is_installed %}
+{%-     for req in nextcloud.required_states_preinstall %}
       - sls: {{ req }}
-{%-   endfor %}
+{%-     endfor %}
+{%-   endif %}
 {%- endif %}
 
 Nextcloud paths are setup:
@@ -123,9 +130,11 @@ Nextcloud is downloaded:
         - skip_verify: true
     - require:
       - Nextcloud gpg key is actually present
-{%- for req in nextcloud.required_states %}
+{%- if not is_installed %}
+{%-   for req in nextcloud.required_states_preinstall %}
       - sls: {{ req }}
-{%- endfor %}
+{%-   endfor %}
+{%- endif %}
     # Do not overwrite existing Nextcloud installations.
     # Upgrades should be done with included updater.
     - unless:

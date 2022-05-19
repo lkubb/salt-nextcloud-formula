@@ -50,7 +50,7 @@ nextcloud:
   groups: {}
   groups_absent: []
   manage_groups_auto: true
-  required_states: []
+  required_states_preinstall: []
   setup_method: cli
   setup_vars:
     admin_pass: correct horse battery staple
