@@ -204,6 +204,8 @@ occ is executable for the web user:
     - name: {{ nextcloud.lookup.webroot | path_join("occ") }}
     - replace: false
     - mode: '0744'
+    - require:
+      - Nextcloud is extracted
 
 {%- if nextcloud.update_auto.enabled %}
 
