@@ -63,6 +63,7 @@ def occ(
     webuser=None,
     json=True,
     raise_error=True,
+    expect_error=False,
     env=None,
     stdin=None,
     quiet=False,
@@ -104,6 +105,11 @@ def occ(
 
     raise_error
         Raise an exception if the return code is not 0. Defaults to true.
+
+    expect_error
+        Do not treat a return code != 0 as an error condition.
+        This causes Salt to not log the command as an error.
+        Defaults to False. Setting this to True implies raise_error=False.
 
     env
         Mapping of environment variables to set prior to execution.
@@ -169,9 +175,10 @@ def occ(
         runas=webuser,
         stdin=stdin,
         python_shell=python_shell,
+        ignore_retcode=expect_error,
     )
 
-    if raise_error and out["retcode"]:
+    if not expect_error and raise_error and out["retcode"]:
         raise CommandExecutionError(
             "Failed running occ {}.\nstderr: {}\nstdout: {}".format(
                 command, out["stderr"], out["stdout"]
@@ -732,7 +739,14 @@ def app_getpath(app, webroot=None, webuser=None):
     return out["stdout"]
 
 
-def app_install(app, force=False, keep_disabled=False, allow_unstable=False, webroot=None, webuser=None):
+def app_install(
+    app,
+    force=False,
+    keep_disabled=False,
+    allow_unstable=False,
+    webroot=None,
+    webuser=None,
+):
     """
     Install an app.
 
@@ -2029,6 +2043,63 @@ def group_delete(groupid, webroot=None, webuser=None):
     return out["stdout"] or True
 
 
+def group_exists(groupid, webroot=None, webuser=None):
+    """
+    Check if a group exists.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' nextcloud_server.group_exists fsociety
+
+    groupid
+        The Nextcloud group ID.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    args = [groupid, "le7s_hop3_n0_0ne_cr34t3s_a_user_l1ke_thi5"]
+
+    # Since group_list has a limit, we need to use another method
+    # to reliably determine the existence of a group.
+    # Using the occ command directly to not bloat the config of group_removeuser
+    # to hide the error output.
+    out = occ(
+        "group:removeuser",
+        args,
+        json=False,
+        expect_error=True,
+        webroot=webroot,
+        webuser=webuser,
+    )
+
+    if out["retcode"] == 0:
+        raise CommandExecutionError(
+            "Uhm, did you actually create a user named 'le7s_hop3_n0_0ne_cr34t3s_a_user_l1ke_thi5' and added it to group '{}'? Well, he's gone from that group now, sorry.".format(
+                groupid
+            )
+        )
+
+    if "group not found" in out["stdout"]:
+        return False
+    elif "user not found" in out["stdout"]:
+        return True
+
+    raise CommandExecutionError(
+        "An unexpected error occured while trying to determine if group '{}' exists. The output was:\n\nstdout:\n{}\n\nstderr:\n{}\n".format(
+            groupid, out["stdout"], out["stderr"]
+        )
+    )
+
+
 def group_list(limit=500, offset=0, webroot=None, webuser=None):
     """
     List configured groups and their users.
@@ -2110,7 +2181,7 @@ def log_manage(backend=None, level=None, timezone=None, webroot=None, webuser=No
         salt '*' nextcloud_server.log_manage backend=syslog level=info
 
     backend
-        Set the logging backend [file, syslog, errorlog, systemd.
+        Set the logging backend [file, syslog, errorlog, systemd].
 
     level
         Set the log level [debug, info, warning, error, fatal].
@@ -2943,9 +3014,9 @@ def update_check(webroot=None, webuser=None):
         out["stdout"],
         re.MULTILINE,
     )
-    count = re.findall(r"^([\d]+) updates available", out["stdout"], re.MULTILINE)
+    count = re.findall(r"^([\d]+) update(s|) available", out["stdout"], re.MULTILINE)
 
-    if len(system) + len(apps) != count:
+    if not count or len(system) + len(apps) != int(count[0][0]):
         raise CommandExecutionError(
             "Something went wrong parsing the following Nextcloud output:\n\n{}".format(
                 out["stdout"]
@@ -3227,16 +3298,22 @@ def user_exists(user_id, webroot=None, webuser=None):
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
     """
 
-    try:
-        # user_list might not return all users on large installations
-        user_info(user_id, webroot=webroot, webuser=webuser)
+    # user_list might not return all users on large installations
+    out = occ(
+        "user:info", [user_id], expect_error=True, webroot=webroot, webuser=webuser
+    )
 
-    except CommandExecutionError as e:
-        if "user not found" in str(e):
-            return False
-        raise e
+    if not out["retcode"]:
+        return True
 
-    return True
+    if out["retcode"] and "user not found" in out["stdout"]:
+        return False
+
+    raise CommandExecutionError(
+        "An unexpected error occurred while checking for existence of user '{}'. Output was:\n\nstdout:\n{}\n\nstderr:\n{}\n".format(
+            user_id, out["stdout"], out["stderr"]
+        )
+    )
 
 
 def user_info(user_id, webroot=None, webuser=None):
@@ -3267,6 +3344,34 @@ def user_info(user_id, webroot=None, webuser=None):
     out = occ("user:info", args, webroot=webroot, webuser=webuser)
 
     return out["parsed"]
+
+
+def user_enabled(user_id, webroot=None, webuser=None):
+    """
+    Check whether a user account is enabled.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' nextcloud_server.user_enabled h4xx0r
+
+    user_id
+        User ID of the user to check.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    info = user_info(user_id, webroot=webroot, webuser=webuser)
+
+    return info["enabled"]
 
 
 def user_lastseen(user_id, webroot=None, webuser=None):

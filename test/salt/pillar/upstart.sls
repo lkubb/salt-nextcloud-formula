@@ -37,6 +37,8 @@ nextcloud:
     user: www-data
     webroot: /var/www/nextcloud
   additional_groups: []
+  apps: {}
+  apps_absent: []
   caching:
     distributed: false
     local: apcu
@@ -45,6 +47,8 @@ nextcloud:
   cron:
     daemon: systemd
     timer: 5
+  groups: {}
+  groups_absent: []
   manage_groups_auto: true
   required_states: []
   setup_method: cli
@@ -61,6 +65,8 @@ nextcloud:
   update_auto:
     enabled: true
     no_backup: false
+  users: {}
+  users_absent: []
   version: latest
   version_major: 24
   web_install_use_defaults: false

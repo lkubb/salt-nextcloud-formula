@@ -248,6 +248,237 @@ def uptodate(
     return ret
 
 
+def app_removed(name, webroot=None, webuser=None):
+    """
+    Make sure an app is removed.
+
+    name
+        Name of the app.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+
+    try:
+        current = __salt__["nextcloud_server.app_list"](
+            webroot=webroot, webuser=webuser
+        )
+        is_installed = name in current["enabled"] or name in current["disabled"]
+
+        if not is_installed:
+            ret["comment"] = "App '{}' is already removed.".format(name)
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] = "App '{}' would have been removed.".format(name)
+            ret["changes"] = {"removed": name}
+        elif __salt__["nextcloud_server.app_remove"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "App '{}' has been removed.".format(name)
+            ret["changes"] = {"removed": name}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while removing app '{}'.".format(
+                name
+            )
+
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] += str(e)
+
+    return ret
+
+
+def app_installed(
+    name,
+    force=False,
+    enabled=True,
+    groups=None,
+    allow_unstable=False,
+    webroot=None,
+    webuser=None,
+):
+    """
+    Make sure an app is installed.
+
+    name
+        Name of the app.
+
+    force
+        Install the app regardless of the Nextcloud version requirement. Defaults to False.
+
+    enabled
+        Enable the app. Defaults to True.
+
+    groups
+        If enabled, only enable this app for specific groups.
+
+    allow_unstable
+        Allow installing unstable releases. Defaults to False.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+    enabled_str = "enable" if enabled else "disable"
+
+    try:
+        current = __salt__["nextcloud_server.app_list"](
+            webroot=webroot, webuser=webuser
+        )
+
+        is_enabled = name in current["enabled"]
+        is_installed = is_enabled or name in current["disabled"]
+
+        add_groups = None
+        del_groups = None
+
+        # Groups make this a bit complicated.
+        # occ does not allow changing the value of groups once an app
+        # has been enabled. Therefore, to change the group settings,
+        # an app has to be disabled temporarily.
+        # The following checks if this is necessary and helps to report
+        # correct changes.
+        if enabled and is_enabled:
+            # this can return the string "yes" or a list of groups
+            current_groups = __salt__["nextcloud_server.config_app_get"](
+                name, "enabled"
+            )
+
+            # if the app is enabled for all users, set add_groups to
+            # groups. This covers both set and unset groups.
+            if not isinstance(current_groups, list):
+                add_groups = groups
+            # If the app is restricted to certain groups and should be,
+            # see if wanted and current state match
+            elif groups:
+                add_groups = set(groups) - set(current_groups)
+                del_groups = set(current_groups) - set(groups)
+            # If the app is restricted to certain groups, but should
+            # not be, make sure they are removed.
+            else:
+                del_groups = current_groups
+
+        elif enabled:
+            add_groups = groups
+
+        need_reset = True if add_groups or del_groups else False
+
+        if is_installed and enabled == is_enabled and not need_reset:
+            ret["comment"] = "App '{}' is already installed and {}d".format(
+                name, enabled_str
+            )
+            ret["comment"] += " for the correct groups." if enabled and groups else "."
+            return ret
+
+        if not is_installed:
+            if __opts__["test"]:
+                ret["result"] = None
+                ret[
+                    "comment"
+                ] = "App '{}' would have been installed and {}d afterwards.".format(
+                    name, enabled_str
+                )
+                ret["changes"] = {"installed": name, enabled_str + "d": name}
+            elif __salt__["nextcloud_server.app_install"](
+                name,
+                force=force,
+                keep_disabled=not enabled,
+                allow_unstable=allow_unstable,
+                webroot=webroot,
+                webuser=webuser,
+            ):
+                ret["result"] = True
+                ret["comment"] = "App '{}' has been installed in {}d state.".format(
+                    name, enabled_str
+                )
+                ret["changes"] = {"installed": name, enabled_str + "d": name}
+            else:
+                # this should not hit, errors are raised
+                ret["result"] = False
+                ret[
+                    "comment"
+                ] = "Something went wrong while installing app '{}'.".format(name)
+            if not need_reset or False == ret["result"]:
+                return ret
+
+        if need_reset and not __opts__["test"]:
+            # This will only be needed if the app should be enabled for a selection
+            # of groups that has to change.
+            __salt__["nextcloud_server.app_disable"](
+                name, webroot=webroot, webuser=webuser
+            )
+
+        if enabled or need_reset:
+            if __opts__["test"]:
+                ret["result"] = None
+                ret["comment"] += "The app '{}' would have been enabled".format(name)
+                ret["comment"] += " for a selection of groups." if groups else "."
+                ret["changes"]["enabled"] = name
+                if add_groups:
+                    ret["changes"]["enabled_for"] = add_groups
+                if del_groups:
+                    ret["changes"]["disabled_for"] = del_groups
+            elif __salt__["nextcloud_server.app_enable"](
+                name, force=force, groups=groups, webroot=webroot, webuser=webuser
+            ):
+                ret["comment"] += "The app '{}' has been enabled".format(name)
+                ret["comment"] += " for a selection of groups." if groups else "."
+                ret["changes"]["enabled"] = name
+                if add_groups:
+                    ret["changes"]["enabled_for"] = add_groups
+                if del_groups:
+                    ret["changes"]["disabled_for"] = del_groups
+            else:
+                # this should not hit, errors are raised
+                ret["result"] = False
+                ret[
+                    "comment"
+                ] += "Something went wrong while enabling app '{}'.".format(name)
+            return ret
+
+        # Now only disabling is on the table
+
+        if __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] += "The app '{}' would have been disabled".format(name)
+            ret["changes"]["disabled"] = name
+
+        elif __salt__["nextcloud_server.app_disable"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] += "The app '{}' has been disabled".format(name)
+            ret["changes"]["disabled"] = name
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] += "Something went wrong while disabling app '{}'.".format(
+                name
+            )
+
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] = str(e)
+
+    return ret
+
+
 def config_set(name, value, vtype=None, separator=":", webroot=None, webuser=None):
     """
     Make sure a Nextcloud system configuration is set as specified.
@@ -524,6 +755,331 @@ def config_imported(name, config=None, force=False, webroot=None, webuser=None):
         ] = "Applied configuration successfully, but resulting configuration had errors. Tried to revert, but that resulted in an exception. Output was:\n\n{}".format(
             e
         )
+
+    return ret
+
+
+def group_absent(name, webroot=None, webuser=None):
+    """
+    Make sure a group does not exist.
+
+    name
+        The Nextcloud group ID to ensure absence of.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+
+    try:
+        if not __salt__["nextcloud_server.group_exists"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "Group '{}' is already absent.".format(name)
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] = "Group '{}' would have been deleted.".format(name)
+            ret["changes"] = {"deleted": name}
+        elif __salt__["nextcloud_server.group_delete"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "Group '{}' has been deleted.".format(name)
+            ret["changes"] = {"deleted": name}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while deleting user '{}'.".format(
+                name
+            )
+
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] += str(e)
+
+    return ret
+
+
+def group_present(
+    name, addusers=None, delusers=None, max_iterations=3, webroot=None, webuser=None
+):
+    """
+    Make sure a group exists.
+
+    name
+        The Nextcloud group ID.
+
+    addusers
+        List of user IDs to make sure are in the group.
+
+    delusers
+        List of user IDs to make sure are absent from the group.
+
+    max_iterations
+        Maximum allowed number of calls to group_list to find
+        information about a group. Every call returns 500 groups,
+        so this is only relevant for very large installations.
+        Defaults to 3.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+
+    if addusers is None:
+        addusers = []
+
+    if delusers is None:
+        delusers = []
+
+    try:
+        if __salt__["nextcloud_server.group_exists"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "Group '{}' already exists.".format(name)
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret[
+                "comment"
+            ] = "Group '{}' would have been created. This does not check for existence of user accounts, so make sure they exist before adding them to the group".format(
+                name
+            )
+            ret["changes"] = {"group_created": name, "members_added": addusers}
+            return ret
+        elif __salt__["nextcloud_server.group_add"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "User '{}' has been created.".format(name)
+            ret["changes"] = {"group_created": name}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while creating user '{}'.".format(
+                name
+            )
+            return ret
+
+        if not addusers and not delusers:
+            return ret
+
+        # For very large installations, one call might not be enough
+        # to get information about the group.
+
+        current = {}
+        iterations = 0
+        limit = 500
+
+        while name not in current and iterations < max_iterations:
+            offset = limit * iterations
+            current = __salt__["nextcloud_server.group_list"](
+                limit=limit, offset=offset, webroot=webroot, webuser=webuser
+            )
+            iterations += 1
+
+        if name not in current:
+            ret["result"] = False
+            ret[
+                "comment"
+            ] += " Could not find the group member list though. In case you have more than {} groups, try to increase max_iterations.".format(
+                str(limit * max_iterations)
+            )
+            return ret
+
+        current = current[name]
+
+        ret["changes"]["users_added"] = []
+        ret["changes"]["users_removed"] = []
+
+        for user in addusers:
+            if user not in current:
+                __salt__["nextcloud_server.group_adduser"](
+                    name, user, webroot=webroot, webuser=webuser
+                )
+                ret["changes"]["users_added"].append(user)
+
+        for user in delusers:
+            if user in current:
+                __salt__["nextcloud_server.group_removeuser"](
+                    name, user, webroot=webroot, webuser=webuser
+                )
+                ret["changes"]["users_removed"].append(user)
+
+        # Doing it like this to avoid information loss when
+        # a user account does not exist.
+        if not ret["changes"]["users_added"]:
+            ret["changes"].pop("users_added")
+
+        if not ret["changes"]["users_removed"]:
+            ret["changes"].pop("users_removed")
+
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] += str(e)
+
+    return ret
+
+
+def user_absent(name, webroot=None, webuser=None):
+    """
+    Make sure a user account does not exist.
+
+    name
+        User ID of the user to ensure absence of.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+
+    try:
+        if not __salt__["nextcloud_server.user_exists"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "User '{}' is already absent.".format(name)
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] = "User '{}' would have been deleted.".format(name)
+            ret["changes"] = {"deleted": name}
+        elif __salt__["nextcloud_server.user_delete"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "User '{}' has been deleted.".format(name)
+            ret["changes"] = {"deleted": name}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while deleting user '{}'.".format(
+                name
+            )
+
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] += str(e)
+
+    return ret
+
+
+def user_present(
+    name,
+    enabled=True,
+    init_password=None,
+    init_password_pillar=None,
+    webroot=None,
+    webuser=None,
+):
+    """
+    Make sure a user account is present.
+
+    name
+        User ID used to login. Can only contain alphanumeric chars and ``-_@``.
+
+    enabled
+        Whether this user account is enabled. Defaults to True.
+
+    init_password
+        The user's initial password. Will not be managed after creation.
+        Better use password_pillar to avoid logs/caches.
+        ``init_password`` or ``init_password_pillar`` is required.
+
+    init_password_pillar
+        The pillar key where the user's initial password can be looked up.
+        ``password`` or ``password_pillar`` is required.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+
+    try:
+        if __salt__["nextcloud_server.user_exists"](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "User '{}' already exists.".format(name)
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] = "User '{}' would have been created.".format(name)
+            ret["changes"] = {"created": name}
+        elif __salt__["nextcloud_server.user_add"](
+            name,
+            password=init_password,
+            password_pillar=init_password_pillar,
+            webroot=webroot,
+            webuser=webuser,
+        ):
+            ret["comment"] = "User '{}' has been created.".format(name)
+            ret["changes"] = {"created": name}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while creating user '{}'.".format(
+                name
+            )
+            return ret
+
+        # when testing, return early to not cause exceptions on lookup
+        # of absent user account
+        if ret["result"] is None:
+            if not enabled:
+                ret[
+                    "comment"
+                ] += " The user account would have been disabled after creation."
+                ret["changes"] |= {"disabled": name}
+            return ret
+
+        current = __salt__["nextcloud_server.user_enabled"](
+            name, webroot=webroot, webuser=webuser
+        )
+
+        enabled_str = "enable" if enabled else "disable"
+
+        if current == enabled:
+            ret["comment"] += " The account is already {}d.".format(enabled_str)
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] += " The account would have been {}d.".format(enabled_str)
+            ret["changes"] = {enabled_str + "d": name}
+        elif __salt__["nextcloud_server.user_" + enabled_str](
+            name, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] += " The account has been {}d.".format(enabled_str)
+            ret["changes"] = {enabled_str + "d": name}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while {} user '{}'.".format(
+                "enabling" if enabled else "disabling", name
+            )
+
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] += str(e)
 
     return ret
 
