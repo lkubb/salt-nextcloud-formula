@@ -30,3 +30,5 @@
     {%- do mapdata.additional_groups.append(mapdata.lookup.redis_group) %}
   {%- endif %}
 {%- endif %}
+
+{%- do mapdata | update_dict_key_value("config:system", {"datadirectory": mapdata.lookup.datadir}) %}
