@@ -3,42 +3,135 @@
 # yamllint disable rule:comments-indentation
 ---
 nextcloud:
-
+    # List of additional groups the nextcloud user should be member of
+    # e.g. for socket access. See also `manage_groups_auto`.
   additional_groups: []
-  apps: {}
+    # Manage enabled apps
+  apps:
+      # Empty dicts are fine and will enable the app with default settings.
+    bookmarks: {}
+      # Find the  default values below.
+    calendar:
+        # Allow installation from unstable repos.
+      allow_unstable: false
+        # Force installation/enabled state, even if not officially compatible.
+      force: false
+        # Enable this app only for a selection of groups.
+      groups: []
+        # You can install, but disable an app as well by setting this to false.
+      enable: true
+    # Make sure those apps are not installed.
   apps_absent: []
+    # Set memory caching config.
   caching:
+      # Allowed: redis, memcached, false
     distributed: false
+      # Allowed: redis, apcu, false
     local: apcu
+      # Allowed: redis, false
     locking: false
+    # Configuration values that should be set.
+    # Root keys must be ``system`` for Nextcloud configuration
+    # and ``apps`` for app config.
+    # Set a value to null to make sure it is unset.
   config: {}
+    # Background service configuration (server-side)
   cron:
+      # systemd, cron, anything else for off
     daemon: systemd
+      # minutes between runs
     timer: 5
-  groups: {}
+    # Manage groups
+  groups:
+    evilcorp:
+        # Make sure these users are members.
+      addusers:
+        - phillip_price
+        # Make sure these users are not members.
+      delusers:
+        - angela
+      # Empty dict will still create the group without members.
+    fsociety: {}
+    # Make sure those groups are not on th esystem.
   groups_absent: []
+    # This refers to UNIX groups.
+    # This formula will automatically add the redis user to
+    # the www-data group in case a socket was configured.
   manage_groups_auto: true
+    # List of states that should be included and required
+    # in case the Nextcloud installation has not been finished
+    # successfully. Examples include php, redis, mariadb.
+    # Make sure the corresponding file contains at least some
+    # state definition, not only includes, otherwise Salt will
+    # refuse to require it.
   required_states_preinstall: []
+    # [cli, web]
+    # Automatically setup Nextcloud using the CLI tool ``occ``.
+    # `web` will result in an autoconfig.php file, but you will
+    # have to finish the installation manually and run the state
+    # again after finishing.
   setup_method: cli
+    # Set values required for the initial installation.
   setup_vars:
+      # The default admin password.
     admin_pass: correct horse battery staple
+      # Pillar key to look for the admin pass (preferred).
     admin_pass_pillar: ''
+      # Username of the admin user.
     admin_user: admin
+      # Database type. If sqlite, the rest of the db config is ignored.
     database: sqlite
+      # Database host. For sockets, use `localhost:/path/to/socket
     database_host: ''
     database_name: ''
+      # Password for the db user. Can be empty when sockets are in use.
+      # (socket authentication)
     database_pass: ''
     database_pass_pillar: ''
+      # Username to connect to the database as. When using socket auth,
+      # should be www-data or the corresponding name, depending on your
+      # OS and configuration.
     database_user: ''
+    # Settings for autoupdate functionality in this formula.
   update_auto:
+      # When `nextcloud.package.install` is run, check for system updates
+      # and install them automatically.
     enabled: true
+      # Run `update.phar` with --no-backup flag, i.e. do not create
+      # backups of the current version's source code.
     no_backup: false
-  users: {}
+    # Configure user accounts
+  users:
+    philip_price:
+        # Specify either the initial password or
+      init_password: e(01n4EVA!
+        # the initial password pillar key. Mind that the password
+        # will not be managed after account creation.
+      init_password_pillar: ''
+        # You can create, but disable user accounts as well.
+        # [enabled, disabled, absent]
+      state: enabled
+    # Make sure those users do not exist on the system.
   users_absent: []
+    # Setting this to anything other than latest will prevent
+    # automatic updates and install this specific version only.
+    # You can still update by modifying this value.
   version: latest
+    # If version is latest, this chooses the major version to follow.
+    # On the first installation, this version's latest release will
+    # be installed.
+    # Automatic updates are limited to this major version as well.
   version_major: 24
+    # When choosing the web installer, you probably have a good reason
+    # for it and do not want to be presented with default values
+    # for unspecified values in `setup_vars`. You can enable that
+    # behavior here though, if desired.
   web_install_use_defaults: false
 
+    # You should not have to modify the following values generally.
+    # An exception might be the datadir.
+    # This formula will automatically set the system configuration
+    # accordingly.
   lookup:
     datadir: data
     gpg:
@@ -92,6 +185,7 @@ nextcloud:
       # The entries under `source_files` are prepended to the default source files
       # given for the state
     source_files:
-      nextcloud-config-file-file-managed:
-        - 'example_alt.tmpl'
-        - 'example_alt.tmpl.jinja'
+      Nextcloud background service is installed for systemd:
+        - 'nextcloudcron_alt.service.j2'
+      Nextcloud background timer is installed for systemd:
+        - 'nextcloudcron_alt.timer.j2'

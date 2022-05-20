@@ -14,7 +14,11 @@ Nextcloud Server Formula
    :scale: 100%
    :target: https://github.com/pre-commit/pre-commit
 
-Manage Nextcloud Server with Salt.
+Manage Nextcloud Server installation, updates, apps, users, groups and more with Salt.
+
+This formula includes an execution and state module to achieve tight integration with Nextcloud and thus makes administration much more convenient. Many of the ``occ`` functions have been wrapped.
+
+This formula takes care of the Nextcloud part only. To be able to run Nextcloud, you will need to configure PHP as well as an HTTP server, at least. I use my own formulae for `PHP <https://github.com/lkubb/salt-php-formula>`_, `MariaDB <https://github.com/lkubb/salt-mariadb-formula>`_, `Nginx <https://github.com/lkubb/salt-nginx-formula>`_ and `Redis <https://github.com/lkubb/salt-redis-formula>`_, but most of those are a bit simpler than the official ones found in `the official organization <https://github.com/saltstack-formulas>`_. You can find sample parameters for my formulae in the docs.
 
 .. contents:: **Table of Contents**
    :depth: 1
