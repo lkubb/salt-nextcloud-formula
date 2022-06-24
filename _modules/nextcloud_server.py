@@ -1139,41 +1139,47 @@ def config_import(config, webroot=None, webuser=None):
     args = []
     stdin = None
 
+    doubles = []
+
     if isinstance(config, str):
         args = [config]
-        doubles = []
     else:
         # ---- workaround for https://github.com/nextcloud/server/issues/32468
         # tldr: import of float/doubles is prohibited by config:import
         # this skips list items to not overcomplicate the workaround
-        def find_double(data):
-            if not isinstance(data, dict):
-                if isinstance(data, float):
-                    return data
-                return
-            filtered = {key: find_double(val) for key, val in data.items()}
-            return {key: val for key, val in filtered.items() if val is not None}
+        # this should be fixed in 24.0.3
+        cur_version = version(webroot=webroot, webuser=webuser)
+        fixed_version = packaging.version.parse("24.0.3")
 
-        def filter_double(data, doubles):
-            if not isinstance(data, dict):
-                return
-            filtered = {
-                key: filter_double(val, doubles[key]) if key in doubles else val
-                for key, val in data.items()
-            }
-            return {key: val for key, val in filtered.items() if val is not None}
+        if packaging.version.parse(cur_version) < fixed_version:
+            def find_double(data):
+                if not isinstance(data, dict):
+                    if isinstance(data, float):
+                        return data
+                    return
+                filtered = {key: find_double(val) for key, val in data.items()}
+                return {key: val for key, val in filtered.items() if val is not None}
 
-        def flatten_dict(data, prefix="", separator="|||"):
-            ret = []
-            if not isinstance(data, dict):
-                return [(prefix[: -1 * len(separator)], data)]
-            for key, val in data.items():
-                ret.extend(flatten_dict(data[key], prefix + key + separator))
-            return ret
+            def filter_double(data, doubles):
+                if not isinstance(data, dict):
+                    return
+                filtered = {
+                    key: filter_double(val, doubles[key]) if key in doubles else val
+                    for key, val in data.items()
+                }
+                return {key: val for key, val in filtered.items() if val is not None}
 
-        doubles = find_double(config)
-        config = filter_double(config, doubles)
-        doubles = flatten_dict(doubles)
+            def flatten_dict(data, prefix="", separator="|||"):
+                ret = []
+                if not isinstance(data, dict):
+                    return [(prefix[: -1 * len(separator)], data)]
+                for key, val in data.items():
+                    ret.extend(flatten_dict(data[key], prefix + key + separator))
+                return ret
+
+            doubles = find_double(config)
+            config = filter_double(config, doubles)
+            doubles = flatten_dict(doubles)
         # ---- end workaround --------------
         stdin = salt.utils.json.dumps(config)
 
@@ -1184,6 +1190,8 @@ def config_import(config, webroot=None, webuser=None):
     # ------ workaround, part 2 ------------
     # this needs to be below the import, otherwise nested
     # values would be overwritten
+    # doubles are always empty, unless the workaround was necessary,
+    # so checking for version is superfluous
 
     for p, val in doubles:
         scope, *key = p.split("|||")
