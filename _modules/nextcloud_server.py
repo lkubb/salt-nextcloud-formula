@@ -36,7 +36,7 @@ from salt.exceptions import CommandExecutionError, SaltInvocationError
 log = logging.getLogger(__name__)
 __virtualname__ = "nextcloud_server"
 
-ensure_apc = True
+ensure_apc_global = True
 web_user = "www-data"
 web_root = "/var/www/nextcloud"
 
@@ -48,10 +48,10 @@ def __virtual__():
 def __init__(opts):
     global web_user
     global web_root
-    global ensure_apc
+    global ensure_apc_global
     web_user = opts.get("nextcloud_server.user", web_user)
     web_root = opts.get("nextcloud_server.webroot", web_root)
-    ensure_apc = opts.get("nextcloud_server.ensure_apc", ensure_apc)
+    ensure_apc_global = opts.get("nextcloud_server.ensure_apc", ensure_apc_global)
 
 
 def occ(
@@ -61,6 +61,7 @@ def occ(
     flags=None,
     webroot=None,
     webuser=None,
+    ensure_apc=None,
     json=True,
     raise_error=True,
     expect_error=False,
@@ -99,6 +100,14 @@ def occ(
         The web user account running Nextcloud, usually ``www-data``, ``apache``.
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
 
+    ensure_apc
+        Run commands with ``php --define apc.enable_cli=1`` to ensure
+        apcu is enabled in CLI mode, which it is not by default.
+        Defaults to minion config value ``nextcloud_server.ensure_apc`` or True.
+
+        Mind that setting this if not enabled in Nextcloud is fine,
+        but the absence of apcu when enabled causes occ to break.
+
     json
         Make sure parameters includes --output json and parse the output accordingly.
         Defaults to True currently, but not all commands support it.
@@ -135,6 +144,8 @@ def occ(
         webuser = web_user
     if webroot is None:
         webroot = web_root
+    if ensure_apc is None:
+        ensure_apc = ensure_apc_global
     if env is None:
         env = {}
 
@@ -538,7 +549,7 @@ def status(webroot=None, webuser=None):
     return out["parsed"]
 
 
-def upgrade(no_backup=False, webroot=None, webuser=None):
+def upgrade(no_backup=False, webroot=None, webuser=None, ensure_apc=None):
     """
     Runs ``updater.phar`` in non-interactive mode.
 
@@ -566,10 +577,16 @@ def upgrade(no_backup=False, webroot=None, webuser=None):
     webuser
         The web user account running Nextcloud, usually ``www-data``, ``apache``.
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+
+    ensure_apc
+        Run commands with ``php --define apc.enable_cli=1`` to ensure
+        apcu is enabled in CLI mode, which it is not by default.
+        Defaults to minion config value ``nextcloud_server.ensure_apc`` or True.
     """
 
     webroot = webroot or web_root
     webuser = webuser or web_user
+    ensure_apc = ensure_apc_global if ensure_apc is None else ensure_apc
 
     updater = Path(webroot) / "updater" / "updater.phar"
 
@@ -591,7 +608,7 @@ def upgrade(no_backup=False, webroot=None, webuser=None):
     if out["retcode"] > 0:
         raise CommandExecutionError(
             "Upgrading Nextcloud failed.\n\nStdout:\n{}\n\nStderr:\n{}".format(
-                stdout, stderr
+                out["stdout"], out["stderr"]
             )
         )
 
