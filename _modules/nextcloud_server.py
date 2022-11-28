@@ -1169,6 +1169,7 @@ def config_import(config, webroot=None, webuser=None):
         fixed_version = packaging.version.parse("24.0.3")
 
         if packaging.version.parse(cur_version) < fixed_version:
+
             def find_double(data):
                 if not isinstance(data, dict):
                     if isinstance(data, float):
@@ -1191,7 +1192,7 @@ def config_import(config, webroot=None, webuser=None):
                 if not isinstance(data, dict):
                     return [(prefix[: -1 * len(separator)], data)]
                 for key, val in data.items():
-                    ret.extend(flatten_dict(data[key], prefix + key + separator))
+                    ret.extend(flatten_dict(val, prefix + key + separator))
                 return ret
 
             doubles = find_double(config)
@@ -1593,7 +1594,7 @@ def db_convert_type(
     clear_schema=False,
     all_apps=False,
     chunk_size=None,
-    databasewebroot=None,
+    webroot=None,
     webuser=None,
 ):
     """
@@ -1860,7 +1861,7 @@ def files_scan(
         webuser=webuser,
     )
 
-    return out["parsed"] or True
+    return out["stdout"] or True
 
 
 def files_scan_app_data(folder=None, webroot=None, webuser=None):
@@ -2117,7 +2118,7 @@ def group_exists(groupid, webroot=None, webuser=None):
 
     if "group not found" in out["stdout"]:
         return False
-    elif "user not found" in out["stdout"]:
+    if "user not found" in out["stdout"]:
         return True
 
     raise CommandExecutionError(
@@ -3050,7 +3051,7 @@ def update_check(webroot=None, webuser=None):
             )
         )
 
-    ret = {app: version for app, version in apps}
+    ret = dict(apps)
 
     if system:
         ret["Nextcloud"] = system[0]

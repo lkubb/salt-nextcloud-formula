@@ -7,6 +7,7 @@ with Salt, using ``occ`` and the inbuilt updater.
 """
 
 import logging
+from pathlib import Path
 
 import salt.utils.dictdiffer
 import salt.utils.json
@@ -381,7 +382,7 @@ def app_installed(
         elif enabled:
             add_groups = groups
 
-        need_reset = True if add_groups or del_groups else False
+        need_reset = bool(add_groups or del_groups)
 
         if is_installed and enabled == is_enabled and not need_reset:
             ret["comment"] = "App '{}' is already installed and {}d".format(
@@ -418,7 +419,7 @@ def app_installed(
                 ret[
                     "comment"
                 ] = "Something went wrong while installing app '{}'.".format(name)
-            if not need_reset or False == ret["result"]:
+            if not need_reset or not ret["result"]:
                 return ret
 
         if need_reset and not __opts__["test"]:
@@ -725,7 +726,7 @@ def config_imported(name, config=None, force=False, webroot=None, webuser=None):
 
     status = __salt__["nextcloud_server.check"](webroot=webroot, webuser=webuser)
 
-    if status == True:
+    if status is True:
         return ret
 
     # If we're here, this means changing the configuration produced errors.
