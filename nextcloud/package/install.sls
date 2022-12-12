@@ -91,7 +91,7 @@ Salt can manage gpg for Nextcloud:
 
 Nextcloud signing key is present (from keyserver):
   gpg.present:
-    - name: {{ nextcloud.lookup.gpg.fingerprint }}
+    - name: {{ nextcloud.lookup.gpg.fingerprint[:-16] }}
     - keyserver: {{ nextcloud.lookup.gpg.keyserver }}
     - require:
       - Salt can manage gpg for Nextcloud
@@ -117,14 +117,16 @@ Nextcloud signing key is present (fallback):
     - require:
       - file: /tmp/nextcloud.asc
 
-# Fun fact:
-# When the signature cannot be verified because the key is missing,
-# `gpg.verify` just returns true. Huh. Unexpected.
-# I should definitely write a function for the state module.
+{%- if "gpg.verified" not in salt %}
+
+# Ensure the following does not run without the key being present.
+# The official gpg modules are currently big liars and always report
+# `Yup, no worries! Everything is fine.`
 Nextcloud gpg key is actually present:
   module.run:
     - gpg.get_key:
       - fingerprint: {{ nextcloud.lookup.gpg.fingerprint }}
+{%- endif %}
 
 Nextcloud is downloaded:
   file.managed:
@@ -148,17 +150,30 @@ Nextcloud is downloaded:
       - fun: file.file_exists
         path: {{ nextcloud.lookup.webroot | path_join("occ") }}
 
+
+{%- if "gpg.verified" not in salt %}
+
 Nextcloud signature is verified:
-  module.run:
-    - gpg.verify:
-      - filename: {{ tmp_pkg }}
-      - signature: {{ tmp_sig }}
+  test.configurable_test_state:
+    - name: Check if the downloaded archive has been signed by the release signing key.
+    - changes: False
+    - result: >
+        __slot__:salt:gpg.verify(filename={{ tmp_pkg }},
+        signature={{ tmp_sig }}).res
     - require:
       - Nextcloud gpg key is actually present
       - Nextcloud is downloaded
-    - unless:
-      - fun: file.file_exists
-        path: {{ nextcloud.lookup.webroot | path_join("occ") }}
+{%- else %}
+
+Nextcloud signature is verified:
+  gpg.verified:
+    - name: {{ tmp_pkg }}
+    - signature: {{ tmp_sig }}
+    - signed_by_any: {{ nextcloud.lookup.gpg.fingerprint }}
+    - require:
+      - Nextcloud gpg key is actually present
+      - Nextcloud is downloaded
+{%- endif %}
 
 Nextcloud is removed if signature verification failed:
   file.absent:
