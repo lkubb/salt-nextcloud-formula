@@ -230,6 +230,7 @@ occ is executable for the web user:
 
 Nextcloud is up to date:
   nextcloud_server.uptodate:
+    - max_version: {{ version or "null" }}
     - no_backup: {{ nextcloud.update_auto.no_backup }}
     - webroot: {{ nextcloud.lookup.webroot }}
     - webuser: {{ nextcloud.lookup.user }}
