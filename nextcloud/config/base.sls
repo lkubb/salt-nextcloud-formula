@@ -69,7 +69,9 @@ Nextcloud installation is initialized:
     - webroot: {{ nextcloud.lookup.webroot }}
     - webuser: {{ nextcloud.lookup.user }}
     - require:
-      - sls: {{ sls_package_install }}
+      - Nextcloud is extracted
+      - Custom Nextcloud modules are synced
+      - occ is executable for the web user
 {%- endif %}
 
 # At this point, Nextcloud should not complain about misconfiguration.
