@@ -163,6 +163,8 @@ Nextcloud signature is verified:
     - require:
       - Nextcloud gpg key is actually present
       - Nextcloud is downloaded
+    - onchanges:
+      - Nextcloud is downloaded
 {%- else %}
 
 Nextcloud signature is verified:
@@ -172,6 +174,8 @@ Nextcloud signature is verified:
     - signed_by_any: {{ nextcloud.lookup.gpg.fingerprint }}
     - require:
       - Nextcloud gpg key is actually present
+      - Nextcloud is downloaded
+    - onchanges:
       - Nextcloud is downloaded
 {%- endif %}
 
