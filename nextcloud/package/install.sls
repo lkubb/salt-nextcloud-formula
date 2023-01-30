@@ -117,7 +117,7 @@ Nextcloud signing key is present (fallback):
     - require:
       - file: /tmp/nextcloud.asc
 
-{%- if "gpg.verified" not in salt %}
+{%- if "gpg" not in salt["saltutil.list_extmods"]().get("states", []) %}
 
 # Ensure the following does not run without the key being present.
 # The official gpg modules are currently big liars and always report
@@ -151,7 +151,7 @@ Nextcloud is downloaded:
         path: {{ nextcloud.lookup.webroot | path_join("occ") }}
 
 
-{%- if "gpg.verified" not in salt %}
+{%- if "gpg" not in salt["saltutil.list_extmods"]().get("states", []) %}
 
 Nextcloud signature is verified:
   test.configurable_test_state:
