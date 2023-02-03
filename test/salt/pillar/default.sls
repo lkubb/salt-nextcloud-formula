@@ -8,8 +8,6 @@ nextcloud:
     winner: lookup
     added_in_lookup: lookup_value
     config: 'config/config.php'
-    service:
-      name: nextcloudcron
     datadir: data
     gpg:
       fingerprint: 28806A878AE423A28372792ED75899B9A724937A
