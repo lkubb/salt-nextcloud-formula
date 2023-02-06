@@ -19,13 +19,13 @@ values:
     group: www-data
     pkg:
       exact:
-        sig: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2.asc
-        source: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2
-        source_hash: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2.sha512
+        sig: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2.asc  # yamllint disable-line rule:line-length
+        source: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2  # yamllint disable-line rule:line-length
+        source_hash: https://download.nextcloud.com/server/releases/nextcloud-{version}.tar.bz2.sha512  # yamllint disable-line rule:line-length
       latest_major:
         sig: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2.asc
         source: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2
-        source_hash: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2.sha512
+        source_hash: https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2.sha512  # yamllint disable-line rule:line-length
     redis_group: redis
     service:
       name: nextcloudcron

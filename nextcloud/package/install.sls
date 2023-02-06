@@ -126,6 +126,8 @@ Nextcloud gpg key is actually present:
   module.run:
     - gpg.get_key:
       - fingerprint: {{ nextcloud.lookup.gpg.fingerprint }}
+    - require_in:
+      - Nextcloud is downloaded
 {%- endif %}
 
 Nextcloud is downloaded:
@@ -137,9 +139,8 @@ Nextcloud is downloaded:
       - {{ tmp_sig }}:
         - source: {{ sig_src }}
         - skip_verify: true
-    - require:
-      - Nextcloud gpg key is actually present
 {%- if not is_installed %}
+    - require:
 {%-   for req in nextcloud.required_states_preinstall %}
       - sls: {{ req }}
 {%-   endfor %}
@@ -149,7 +150,6 @@ Nextcloud is downloaded:
     - unless:
       - fun: file.file_exists
         path: {{ nextcloud.lookup.webroot | path_join("occ") }}
-
 
 {%- if "gpg" not in salt["saltutil.list_extmods"]().get("states", []) %}
 
@@ -162,7 +162,6 @@ Nextcloud signature is verified:
         signature={{ tmp_sig }}).res
     - require:
       - Nextcloud gpg key is actually present
-      - Nextcloud is downloaded
     - onchanges:
       - Nextcloud is downloaded
 {%- else %}
@@ -172,9 +171,6 @@ Nextcloud signature is verified:
     - name: {{ tmp_pkg }}
     - signature: {{ tmp_sig }}
     - signed_by_any: {{ nextcloud.lookup.gpg.fingerprint }}
-    - require:
-      - Nextcloud gpg key is actually present
-      - Nextcloud is downloaded
     - onchanges:
       - Nextcloud is downloaded
 {%- endif %}
