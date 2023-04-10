@@ -1,3 +1,5 @@
+{#- vim: ft=jinja #}
+
 {#- Make datadir relative to webroot if path is not absolute -#}
 {%- if not mapdata.lookup.datadir.startswith("/") %}
   {%- do mapdata.lookup.update({"datadir": mapdata.lookup.webroot | path_join(mapdata.lookup.datadir)}) %}

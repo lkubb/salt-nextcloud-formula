@@ -90,7 +90,7 @@ Salt can manage gpg for Nextcloud:
 
 Nextcloud signing key is present (from keyserver):
   gpg.present:
-    - name: {{ nextcloud.lookup.gpg.fingerprint[:-16] }}
+    - name: {{ nextcloud.lookup.gpg.fingerprint[-16:] }}
     - keyserver: {{ nextcloud.lookup.gpg.keyserver }}
     - require:
       - Salt can manage gpg for Nextcloud

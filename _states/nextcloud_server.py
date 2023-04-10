@@ -226,6 +226,11 @@ def uptodate(
                 update_version
             )
             ret["changes"] = {"upgraded": update_version}
+        # @TODO this fails with NFS
+        # so, correct procedure would be:
+        # catch exceptions, check nextcloud_server.status
+        # if version is reported as new one, continue.
+        # then run nextcloud_server.finish_upgrade
         elif __salt__["nextcloud_server.upgrade"](
             no_backup=no_backup, ensure_apc=ensure_apc, webroot=webroot, webuser=webuser
         ):
