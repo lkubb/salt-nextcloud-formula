@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 # vim: ft=sls
 
-{%- set tplroot = tpldir.split('/')[0] %}
+{%- set tplroot = tpldir.split("/")[0] %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
 {%- from tplroot ~ "/libtofs.jinja" import files_switch with context %}
 
@@ -99,8 +98,8 @@ Nextcloud signing key is present (from keyserver):
 Nextcloud signing key is present (fallback):
   file.managed:
     - name: /tmp/nextcloud.asc
-    - source: {{ files_switch(['nextcloud.asc'],
-                              lookup='Nextcloud signing key is present (fallback)'
+    - source: {{ files_switch(["nextcloud.asc"],
+                              lookup="Nextcloud signing key is present (fallback)"
                  )
               }}
       - {{ nextcloud.lookup.gpg.official_src }}:
@@ -245,11 +244,11 @@ Nextcloud is up to date:
 Nextcloud background service is installed for systemd:
   file.managed:
     - name: {{ nextcloud.lookup.service.unit.format(name=nextcloud.lookup.service.name) }}
-    - source: {{ files_switch(['nextcloudcron.service.j2'],
-                              lookup='Nextcloud background service is installed for systemd'
+    - source: {{ files_switch(["nextcloudcron.service.j2"],
+                              lookup="Nextcloud background service is installed for systemd"
                  )
               }}
-    - mode: 644
+    - mode: '0644'
     - user: root
     - group: {{ nextcloud.lookup.rootgroup }}
     - makedirs: True
@@ -266,11 +265,11 @@ Nextcloud background service is installed for systemd:
 Nextcloud background timer is installed for systemd:
   file.managed:
     - name: {{ nextcloud.lookup.service.unit_timer.format(name=nextcloud.lookup.service.name) }}
-    - source: {{ files_switch(['nextcloudcron.timer.j2'],
-                              lookup='Nextcloud background timer is installed for systemd'
+    - source: {{ files_switch(["nextcloudcron.timer.j2"],
+                              lookup="Nextcloud background timer is installed for systemd"
                  )
               }}
-    - mode: 644
+    - mode: '0644'
     - user: root
     - group: {{ nextcloud.lookup.rootgroup }}
     - makedirs: True

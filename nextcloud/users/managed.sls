@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # vim: ft=sls
 
-{%- set tplroot = tpldir.split('/')[0] %}
-{%- set sls_config_file = tplroot ~ '.config.file' %}
+{%- set tplroot = tpldir.split("/")[0] %}
+{%- set sls_config_file = tplroot ~ ".config.file" %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
 
 include:
@@ -20,7 +19,7 @@ User {{ user }} is present:
 {%-     if config.get("init_password_pillar") %}
     - init_password_pillar: {{ config.init_password_pillar }}
 {%-     else %}
-{#- This is intended to fail if neither has been set.#}
+{#- This is intended to fail if neither has been set. #}
     - init_password: {{ config.init_password }}
 {%-     endif %}
     - webroot: {{ nextcloud.lookup.webroot }}

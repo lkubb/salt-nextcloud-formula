@@ -1,19 +1,19 @@
-# -*- coding: utf-8 -*-
 # vim: ft=sls
 
-{%- set tplroot = tpldir.split('/')[0] %}
+{#-
+    Stops the Nextcloud Cron service and disables it at boot time.
+#}
+
+{%- set tplroot = tpldir.split("/")[0] %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
 
+Nextcloud Cron is dead:
 {%- if "systemd" == nextcloud.cron.daemon %}
-
-nextcloud-service-clean-service-dead:
   service.dead:
     - name: {{ nextcloud.lookup.service.name }}.timer
-    - enable: False
+    - enable: false
 
 {%- elif "cron" == nextcloud.cron.daemon %}
-
-nextcloud-service-clean-cron-absent:
   cron.absent:
     - name: >-
         {{ salt["cmd.run_stdout"]("command -v php", runas=nextcloud.lookup.user) or "php" }}
@@ -24,7 +24,5 @@ nextcloud-service-clean-cron-absent:
     - user: {{ nextcloud.lookup.user }}
 
 {%- else %}
-
-No system service was installed for Nextcloud:
   test.nop: []
 {%- endif %}

@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 # vim: ft=sls
 
-{%- set tplroot = tpldir.split('/')[0] %}
-{%- set sls_config_file = tplroot ~ '.config.file' %}
-{%- set sls_groups_managed = tplroot ~ '.groups.managed' %}
+{%- set tplroot = tpldir.split("/")[0] %}
+{%- set sls_config_file = tplroot ~ ".config.file" %}
+{%- set sls_groups_managed = tplroot ~ ".groups.managed" %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
 
 include:

@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # vim: ft=sls
 
-{%- set tplroot = tpldir.split('/')[0] %}
-{%- set sls_package_install = tplroot ~ '.package.install' %}
+{%- set tplroot = tpldir.split("/")[0] %}
+{%- set sls_package_install = tplroot ~ ".package.install" %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
 {%- from tplroot ~ "/libtofs.jinja" import files_switch with context %}
 
@@ -14,14 +13,14 @@ include:
 Nextcloud installation autoconfig is present:
   file.managed:
     - name: {{ nextcloud.lookup.webroot | path_join("config", "autoconfig.php") }}
-    - source: {{ files_switch(['autoconfig.php', 'autoconfig.php.j2'],
-                              lookup='Nextcloud installation autoconfig is present'
+    - source: {{ files_switch(["autoconfig.php", "autoconfig.php.j2"],
+                              lookup="Nextcloud installation autoconfig is present"
                  )
               }}
-    - mode: 640
+    - mode: '0640'
     - user: {{ nextcloud.lookup.user }}
     - group: {{ nextcloud.lookup.group }}
-    - makedirs: True
+    - makedirs: true
     - template: jinja
     - context:
         nextcloud: {{ nextcloud | json }}
@@ -62,7 +61,7 @@ Nextcloud installation is initialized:
 {%-     endif %}
 {%-   endfor %}
 {#- Allow empty passwords for the database user #}
-{%-   if not nextcloud.setup_vars.database_pass_pillar and '' == nextcloud.setup_vars.database_pass %}
+{%-   if not nextcloud.setup_vars.database_pass_pillar and nextcloud.setup_vars.database_pass == "" %}
     - database_pass: ''
 {%-   endif %}
     - datadir: {{ nextcloud.lookup.datadir }}
