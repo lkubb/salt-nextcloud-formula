@@ -43,8 +43,8 @@ Starts the Nextcloud Cron service and enables it at boot time.
 Has a dependency on `nextcloud.config`_.
 
 
-``nextcloud.apps``
-^^^^^^^^^^^^^^^^^^
+``nextcloud.users``
+^^^^^^^^^^^^^^^^^^^
 
 
 
@@ -53,8 +53,8 @@ Has a dependency on `nextcloud.config`_.
 
 
 
-``nextcloud.users``
-^^^^^^^^^^^^^^^^^^^
+``nextcloud.apps``
+^^^^^^^^^^^^^^^^^^
 
 
 
@@ -86,8 +86,8 @@ dependency on `nextcloud.service.clean`_.
 Stops the Nextcloud Cron service and disables it at boot time.
 
 
-``nextcloud.apps.clean``
-^^^^^^^^^^^^^^^^^^^^^^^^
+``nextcloud.users.clean``
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 
@@ -96,8 +96,8 @@ Stops the Nextcloud Cron service and disables it at boot time.
 
 
 
-``nextcloud.users.clean``
-^^^^^^^^^^^^^^^^^^^^^^^^^
+``nextcloud.apps.clean``
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 
