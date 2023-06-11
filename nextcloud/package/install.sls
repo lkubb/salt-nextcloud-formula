@@ -2,7 +2,7 @@
 
 {%- set tplroot = tpldir.split("/")[0] %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
-{%- from tplroot ~ "/libtofs.jinja" import files_switch with context %}
+{%- from tplroot ~ "/libtofsstack.jinja" import files_switch with context %}
 
 {%- if "latest" != nextcloud.version %}
 {%-   set pkg_lookup, version = nextcloud.lookup.pkg.exact, nextcloud.version %}
@@ -98,8 +98,10 @@ Nextcloud signing key is present (from keyserver):
 Nextcloud signing key is present (fallback):
   file.managed:
     - name: /tmp/nextcloud.asc
-    - source: {{ files_switch(["nextcloud.asc"],
-                              lookup="Nextcloud signing key is present (fallback)"
+    - source: {{ files_switch(
+                    ["nextcloud.asc"],
+                    config=nextcloud,
+                    lookup="Nextcloud signing key is present (fallback)",
                  )
               }}
       - {{ nextcloud.lookup.gpg.official_src }}:
@@ -244,14 +246,16 @@ Nextcloud is up to date:
 Nextcloud background service is installed for systemd:
   file.managed:
     - name: {{ nextcloud.lookup.service.unit.format(name=nextcloud.lookup.service.name) }}
-    - source: {{ files_switch(["nextcloudcron.service.j2"],
-                              lookup="Nextcloud background service is installed for systemd"
+    - source: {{ files_switch(
+                    ["nextcloudcron.service", "nextcloudcron.service.j2"],
+                    config=nextcloud,
+                    lookup="Nextcloud background service is installed for systemd",
                  )
               }}
     - mode: '0644'
     - user: root
     - group: {{ nextcloud.lookup.rootgroup }}
-    - makedirs: True
+    - makedirs: true
     - template: jinja
     - context:
         nextcloud: {{ nextcloud | json }}
@@ -265,14 +269,16 @@ Nextcloud background service is installed for systemd:
 Nextcloud background timer is installed for systemd:
   file.managed:
     - name: {{ nextcloud.lookup.service.unit_timer.format(name=nextcloud.lookup.service.name) }}
-    - source: {{ files_switch(["nextcloudcron.timer.j2"],
-                              lookup="Nextcloud background timer is installed for systemd"
+    - source: {{ files_switch(
+                    ["nextcloudcron.timer", "nextcloudcron.timer.j2"],
+                    config=nextcloud,
+                    lookup="Nextcloud background timer is installed for systemd"
                  )
               }}
     - mode: '0644'
     - user: root
     - group: {{ nextcloud.lookup.rootgroup }}
-    - makedirs: True
+    - makedirs: true
     - template: jinja
     - context:
         nextcloud: {{ nextcloud | json }}

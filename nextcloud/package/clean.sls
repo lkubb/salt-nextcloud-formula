@@ -2,7 +2,7 @@
 
 {#-
     Removes the nextcloud package.
-    Has a depency on `nextcloud.config.clean`_.
+    Has a dependency on `nextcloud.config.clean`_.
 #}
 
 {%- set tplroot = tpldir.split("/")[0] %}

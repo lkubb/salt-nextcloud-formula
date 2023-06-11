@@ -72,7 +72,7 @@ uninstalls the package.
 ``nextcloud.package.clean``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Removes the nextcloud package.
-Has a depency on `nextcloud.config.clean`_.
+Has a dependency on `nextcloud.config.clean`_.
 
 
 ``nextcloud.config.clean``

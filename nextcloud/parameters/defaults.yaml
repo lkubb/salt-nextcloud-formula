@@ -66,6 +66,11 @@ values:
   version: latest
   version_major: 24
   web_install_use_defaults: false
+  tofs:
+    files_switch:
+      - id
+      - roles
+      - os_family
   # Just here for testing
   added_in_defaults: defaults_value
   winner: defaults
