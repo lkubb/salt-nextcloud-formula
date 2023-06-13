@@ -3,7 +3,7 @@
 {%- set tplroot = tpldir.split("/")[0] %}
 {%- set sls_package_install = tplroot ~ ".package.install" %}
 {%- from tplroot ~ "/map.jinja" import mapdata as nextcloud with context %}
-{%- from tplroot ~ "/libtofs.jinja" import files_switch with context %}
+{%- from tplroot ~ "/libtofsstack.jinja" import files_switch with context %}
 
 include:
   - {{ sls_package_install }}
@@ -13,8 +13,10 @@ include:
 Nextcloud installation autoconfig is present:
   file.managed:
     - name: {{ nextcloud.lookup.webroot | path_join("config", "autoconfig.php") }}
-    - source: {{ files_switch(["autoconfig.php", "autoconfig.php.j2"],
-                              lookup="Nextcloud installation autoconfig is present"
+    - source: {{ files_switch(
+                    ["autoconfig.php", "autoconfig.php.j2"],
+                    config=nextcloud,
+                    lookup="Nextcloud installation autoconfig is present",
                  )
               }}
     - mode: '0640'
