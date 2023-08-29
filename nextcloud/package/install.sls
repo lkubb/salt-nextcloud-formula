@@ -206,14 +206,10 @@ Nextcloud downloads are removed:
       - Nextcloud is extracted
 
 Custom Nextcloud modules are synced:
-  module.run:
-    - saltutil.sync_all:
-      - refresh: true
-      - extmod_whitelist:
-          modules:
-            - nextcloud_server
-          states:
-            - nextcloud_server
+  saltutil.sync_all:
+    - refresh: true
+    - unless:
+      - '{{ "nextcloud_server" in salt["saltutil.list_extmods"]().get("states", []) | lower }}'
 
 occ is executable for the web user:
   file.managed:

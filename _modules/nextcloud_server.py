@@ -1390,13 +1390,13 @@ def config_system_set(
     webuser=None,
 ):
     """
-    Set an app setting.
+    Set a system setting.
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt '*' nextcloud_server.config_list
+        salt '*' nextcloud_server.config_system_set loglevel 2 integer
 
     name
         Name of the config to set. Separate nested keys with
