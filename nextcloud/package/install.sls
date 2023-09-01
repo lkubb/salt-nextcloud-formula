@@ -65,6 +65,7 @@ Nextcloud paths are setup:
   file.directory:
     - names:
       - {{ nextcloud.lookup.webroot }}
+{%- if "objectstore" not in nextcloud.config.system %}
       - {{ nextcloud.lookup.datadir }}:
         - unless:
           # Check if path is somewhere on network share, might not be able to ensure ownership.
@@ -73,6 +74,7 @@ Nextcloud paths are setup:
               test -d '{{ nextcloud.lookup.datadir }}' &&
               df -P '{{ nextcloud.lookup.datadir }}' |
               awk 'BEGIN {e=1} $NF ~ /^\/.+/ { e=0 ; print $1 ; exit } END { exit e }'
+{%- endif %}
     - user: {{ nextcloud.lookup.user }}
     - group: {{ nextcloud.lookup.group }}
     - mode: '0755'
