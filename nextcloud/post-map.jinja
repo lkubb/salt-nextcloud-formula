@@ -33,6 +33,4 @@
   {%- endif %}
 {%- endif %}
 
-{%- if "objectstore" not in mapdata.config.system %}
-  {%- do mapdata | update_dict_key_value("config:system", {"datadirectory": mapdata.lookup.datadir}) %}
-{%- endif %}
+{%- do mapdata | update_dict_key_value("config:system", {"datadirectory": mapdata.lookup.datadir}) %}
