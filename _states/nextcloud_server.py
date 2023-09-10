@@ -118,38 +118,60 @@ def installed(
     """
 
     ret = {"name": name, "result": True, "comment": "", "changes": {}}
+    verb = "install"
 
     try:
-        if __salt__["nextcloud_server.is_installed"](webroot=webroot, webuser=webuser):
-            ret["comment"] = "Nextcloud installation is already finished."
-        elif __opts__["test"]:
+        try:
+            if __salt__["nextcloud_server.is_installed"](raise_error=True, webroot=webroot, webuser=webuser):
+                ret["comment"] = "Nextcloud installation is already finished."
+                return ret
+        except CommandExecutionError as err:
+            # This indicates it's already installed, but there is an issue
+            # in the configuration. There may be many similar issues.
+            if "Failed to connect to the database" not in str(err):
+                raise
+            verb = "reinstall"
+        ret["changes"] = {f"{verb}ed": "Nextcloud"}
+        if __opts__["test"]:
             ret["result"] = None
-            ret["comment"] = "Nextcloud would have been installed."
-            ret["changes"] = {"installed": "Nextcloud"}
-        elif __salt__["nextcloud_server.install"](
-            database=database,
-            database_name=database_name,
-            database_host=database_host,
-            database_user=database_user,
-            database_pass=database_pass,
-            database_pass_pillar=database_pass_pillar,
-            admin_user=admin_user,
-            admin_pass=admin_pass,
-            admin_pass_pillar=admin_pass_pillar,
-            admin_email=admin_email,
-            datadir=datadir,
-            webroot=webroot,
-            webuser=webuser,
-        ):
-            ret["comment"] = "Nextcloud has been installed."
-            ret["changes"] = {"installed": "Nextcloud"}
+            ret["comment"] = f"Nextcloud would have been {verb}ed."
+            return ret
+        ret["comment"] = f"Nextcloud has been {verb}ed."
+        if verb == "reinstall":
+            config = {}
+            for conf, val in (("dbtype", database), ("dbname", database_name), ("dbhost", database_host), ("dbuser", database_user), ("dbuser", database_user)):
+                if val:
+                    config[conf] = val
+            if database_pass:
+                config["dbpassword"] = database_pass
+            elif database_pass_pillar:
+                config["dbpassword"] = __salt__["pillar.get"](database_pass_pillar)
+            __salt__["nextcloud_server.config_import_raw"](config, webroot=webroot, webuser=webuser)
+        elif verb == "install":
+            __salt__["nextcloud_server.install"](
+                database=database,
+                database_name=database_name,
+                database_host=database_host,
+                database_user=database_user,
+                database_pass=database_pass,
+                database_pass_pillar=database_pass_pillar,
+                admin_user=admin_user,
+                admin_pass=admin_pass,
+                admin_pass_pillar=admin_pass_pillar,
+                admin_email=admin_email,
+                datadir=datadir,
+                webroot=webroot,
+                webuser=webuser,
+            )
         else:
             # this should never hit because errors are raised
             ret["result"] = False
-            ret["comment"] = "Something went wrong while installing Nextcloud."
-    except (SaltInvocationError, CommandExecutionError) as e:
+            ret["comment"] = f"Internal error: unknown operation `{verb}`. This is a bug."
+            ret["changes"] = {}
+    except (SaltInvocationError, CommandExecutionError) as err:
         ret["result"] = False
-        ret["comment"] = str(e)
+        ret["comment"] = str(err)
+        ret["changes"] = {}
 
     return ret
 

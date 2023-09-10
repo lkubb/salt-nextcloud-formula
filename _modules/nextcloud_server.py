@@ -26,6 +26,7 @@ nextcloud_server.user
 
 import logging
 import re
+import shlex
 from pathlib import Path
 
 import salt.utils.json
@@ -271,6 +272,7 @@ def install(
     database_user=None,
     database_pass=None,
     database_pass_pillar=None,
+    database_table_space=None,
     admin_user=None,
     admin_pass=None,
     admin_pass_pillar=None,
@@ -429,7 +431,7 @@ def install(
     if admin_email:
         params.append(("admin-email", admin_email))
 
-    datadir = datadir or string(Path(webroot or web_root) / "data")
+    datadir = datadir or str(Path(webroot or web_root) / "data")
 
     params.append(("data-dir", datadir))
 
@@ -447,9 +449,9 @@ def install(
     return out["stdout"] or True
 
 
-def is_installed(webroot=None, webuser=None):
+def is_installed(raise_error=False, webroot=None, webuser=None):
     """
-    Check if Nextcloud itself is up to date.
+    Check if Nextcloud itself is installed and working correctly.
 
     CLI Example:
 
@@ -466,10 +468,14 @@ def is_installed(webroot=None, webuser=None):
         The web user account running Nextcloud, usually ``www-data``, ``apache``.
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
     """
+    try:
+        stat = status(webroot=webroot, webuser=webuser)
+    except CommandExecutionError:  # pylint: disable=broad-except
+        if raise_error:
+            raise
+        stat = {}
 
-    stat = status(webroot=webroot, webuser=webuser)
-
-    return stat.get("installed", False)
+    return bool(stat.get("installed"))
 
 
 def is_uptodate(max_version=None, webroot=None, webuser=None):
@@ -1165,7 +1171,10 @@ def config_import(config, webroot=None, webuser=None):
         # tldr: import of float/doubles is prohibited by config:import
         # this skips list items to not overcomplicate the workaround
         # this should be fixed in 24.0.3
-        cur_version = version(webroot=webroot, webuser=webuser)
+        try:
+            cur_version = version(webroot=webroot, webuser=webuser)
+        except CommandExecutionError:
+            cur_version = _php(f'require("{webroot or web_root}/version.php"); echo json_encode($OC_VersionString);', webuser=webuser)
         fixed_version = packaging.version.parse("24.0.3")
 
         if packaging.version.parse(cur_version) < fixed_version:
@@ -1279,6 +1288,81 @@ def config_list(app="system", private=False, webroot=None, webuser=None):
     out = occ("config:list", [app], flags=flags, webroot=webroot, webuser=webuser)
 
     return out["parsed"]
+
+
+def config_list_raw(config_file="config/config.php", webroot=None, webuser=None):
+    """
+    Renders the raw configuration file. This is not intended for general usage, only to recover
+    from configuration errors that render the ``occ`` command unusable.
+
+    config_file
+        The file name to import and write, relative to ``webroot``. Defaults to ``config/config.php``.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+    return (_php(f"require('{webroot or web_root}/{config_file}'); echo json_encode($CONFIG);"))
+
+
+def config_import_raw(config, config_file="config/config.php", webroot=None, webuser=None):
+    """
+    Imports raw configuration. This is not intended for general usage, only to recover
+    from configuration errors that render the ``occ`` command unusable.
+
+    config
+        A mapping of config names to values to set. Supported value types are
+        string, int, float and bool.
+
+    config_file
+        The file name to import and write, relative to ``webroot``. Defaults to ``config/config.php``.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+    cfg = "$newCfg = array();\n"
+    for conf, val in config.items():
+        cfg += f"$newCfg['{conf}'] = "
+        if isinstance(val, str):
+            cfg += f'"{val}"'
+        elif isinstance(val, bool):
+            cfg += str(val).lower()
+        elif isinstance(val, (int, float)):
+            cfg += str(val)
+        else:
+            raise CommandExecutionError("Cannot set composite values with raw import")
+        cfg += ";\n"
+    cmd = f"""
+$configFile = '{webroot or web_root}/{config_file}';
+require($configFile);
+{cfg}
+foreach ($newCfg as $conf => $val) {{
+    $CONFIG[$conf] = $val;
+}}
+$content = "<?php\n";
+$content .= '$CONFIG = ';
+$content .= var_export($CONFIG, true);
+$content .= ";\n";
+touch($configFile);
+chmod($configFile, 0640);
+file_put_contents($configFile, $content);
+echo 'true';
+"""
+    out = _php(cmd, webroot=webroot, webuser=webuser)
+    if out is True:
+        return True
+    raise CommandExecutionError(f"Failed raw import of config. Output was: {out}")
 
 
 def config_system_delete(
@@ -3747,3 +3831,32 @@ def user_setting_set(
     )
 
     return out["stdout"] or True
+
+
+def _php(script, json=True, webroot=None, webuser=None, ensure_apc=None):
+    cmd = ["php"]
+
+    if webroot is None:
+        webroot = web_root
+    if webuser is None:
+        webuser = web_user
+    if ensure_apc is None:
+        ensure_apc = ensure_apc_global
+    if ensure_apc:
+        cmd += ["--define", "apc.enable_cli=1"]
+
+    cmd += ["-r", script]
+    out = __salt__["cmd.run_all"](
+        shlex.join(cmd),
+        cwd=webroot,
+        runas=webuser,
+    )
+    if out["retcode"] == 0:
+        if json:
+            return salt.utils.json.loads(out["stdout"])
+        return out["stdout"]
+    raise CommandExecutionError(
+        "Failed running php script '{}'.\nstderr: {}\nstdout: {}".format(
+            shlex.join(cmd), out["stderr"], out["stdout"]
+        )
+    )
