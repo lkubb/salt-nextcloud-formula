@@ -209,7 +209,7 @@ Custom Nextcloud modules are synced:
   saltutil.sync_all:
     - refresh: true
     - unless:
-      - '{{ "nextcloud_server" in salt["saltutil.list_extmods"]().get("states", []) | lower }}'
+      - '{{ ("nextcloud_server" in salt["saltutil.list_extmods"]().get("states", [])) | lower }}'
 
 occ is executable for the web user:
   file.managed:
