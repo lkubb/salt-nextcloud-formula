@@ -66,6 +66,7 @@ Nextcloud paths are setup:
     - names:
       - {{ nextcloud.lookup.webroot }}
       - {{ nextcloud.lookup.datadir }}:
+        - mode: '0770'
         - unless:
           # Check if path is somewhere on network share, might not be able to ensure ownership.
           # @TODO proper check/config
