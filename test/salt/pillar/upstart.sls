@@ -1,4 +1,5 @@
 # vim: ft=yaml
+# yamllint disable rule:line-length
 ---
 nextcloud:
   lookup:
@@ -8,14 +9,15 @@ nextcloud:
     added_in_lookup: lookup_value
     config: 'config/config.php'
     datadir: data
+    formula_reqs:
+      - tar
+      - gpg
+      - bzip2
     gpg:
       fingerprint: 28806A878AE423A28372792ED75899B9A724937A
       keyid: D75899B9A724937A
-      keyserver: attester.flowcrypt.com
+      keyserver: keys.openpgp.org
       official_src: https://nextcloud.com/nextcloud.asc
-      requirements:
-        - gpg
-        - python3-gnupg
     group: www-data
     pkg:
       exact:

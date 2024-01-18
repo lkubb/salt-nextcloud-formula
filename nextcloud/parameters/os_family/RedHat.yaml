@@ -13,4 +13,8 @@
 values:
   lookup:
     pkg_manager: yum
+    formula_reqs:
+      - tar
+      - gnupg2
+      - bzip2
 ...

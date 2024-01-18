@@ -81,13 +81,17 @@ Nextcloud paths are setup:
     - require:
       - Nextcloud user/group are present
 
-Salt can manage gpg for Nextcloud:
+Salt can apply Nextcloud formula:
   pkg.installed:
-    - pkgs: {{ nextcloud.lookup.gpg.requirements | json }}
+    - pkgs: {{ nextcloud.lookup.formula_reqs | json }}
+
+Salt can manage gpg for Nextcloud:
   cmd.run:
     - name: gpg --list-keys
     - unless:
       - test -d /root/.gnupg
+    - require:
+      - Salt can apply Nextcloud formula
 
 Nextcloud signing key is present (from keyserver):
   gpg.present:
@@ -199,6 +203,8 @@ Nextcloud is extracted:
     - unless:
       - fun: file.file_exists
         path: {{ nextcloud.lookup.webroot | path_join("occ") }}
+    - require:
+      - Salt can apply Nextcloud formula
 
 Nextcloud downloads are removed:
   file.absent:
