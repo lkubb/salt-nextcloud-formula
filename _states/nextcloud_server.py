@@ -6,6 +6,7 @@ Manage Nextcloud Server installation, upgrade and configuration
 with Salt, using ``occ`` and the inbuilt updater.
 """
 
+import copy
 import logging
 from pathlib import Path
 
@@ -20,6 +21,153 @@ __virtualname__ = "nextcloud_server"
 
 def __virtual__():
     return __virtualname__
+
+
+def installed_raw(
+    name,
+    database,
+    database_name,
+    database_host,
+    database_user,
+    database_pass,
+    datadir,
+    instanceid,
+    passwordsalt,
+    secret,
+    dbtableprefix="oc_",
+    dbport="",
+    misc_config=None,
+    webroot=None,
+    webuser=None,
+):
+    """
+    Set all Nextcloud configuration in raw mode. This intends to provide an
+    alternative to shared storage (like GlusterFS/Ceph...) for HA setups.
+    It should allow to skip installation on mirrored nodes completely.
+
+    name
+        Unused. Needs to be here because of Salt architecture.
+
+    database
+        Supported database type [sqlite (CE), mysql, pgsql, oci (EE)].
+
+    database_name
+        Name of the database.
+
+    database_host
+        Hostname of the database.
+
+    database_user
+        User name to connect to the database.
+
+    database_pass
+        Password of the database user.
+
+    datadir
+        Path to data directory.
+
+    instanceid
+        The instance ID to set. Should be the same for all nodes.
+
+    passwordsalt
+        Random salt that is only used for old password hashing operations.
+        Should be the same for all nodes.
+
+    secret
+        Secret for HMAC calculation. Should be the same for all nodes.
+
+    dbtableprefix
+        The prefix for database tables. Defaults to ``oc_``.
+
+    dbport
+        The database port. Defaults to the empty string, which will be
+        interpreted as the default port for the database.
+
+    misc_config
+        Miscellaneous configuration that should be imported together
+        with the required one above. Defaults to empty.
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+    ret = {"name": name, "result": True, "comment": "", "changes": {}}
+
+    try:
+        try:
+            if __salt__["nextcloud_server.is_installed"](
+                raise_error=True, webroot=webroot, webuser=webuser
+            ):
+                ret["comment"] = "Nextcloud installation is already finished."
+                return ret
+        except CommandExecutionError as err:
+            # This indicates it's already installed, but there is an issue
+            # in the configuration. There may be many similar issues.
+            if "Failed to connect to the database" not in str(err):
+                raise
+        # This state is only intended for the initial installation, further
+        # configuration should be managed using config_imported.
+        new_config = copy.deepcopy(misc_config or {})
+        forced_config = {
+            "dbtype": database,
+            "dbname": database_name,
+            "dbhost": database_host,
+            "dbuser": database_user,
+            "dbport": dbport,
+            "dbpassword": database_pass,
+            "dbtableprefix": dbtableprefix,
+            "datadirectory": datadir,
+            "instanceid": instanceid,
+            "passwordsalt": passwordsalt,
+            "secret": secret,
+        }
+        new_config.update(forced_config)
+        try:
+            current = __salt__["nextcloud_server.config_list_raw"](
+                webroot=webroot, webuser=webuser
+            )
+        except CommandExecutionError as err:
+            if "No such file or directory" not in str(err):
+                raise
+            current = {}
+        if "maintenance" not in current:
+            new_config["maintenance"] = False
+        if "installed" not in current:
+            new_config["installed"] = True
+        if "version" not in current:
+            new_config["version"] = __salt__["nextcloud_server.version_raw"](
+                webroot=webroot, webuser=webuser
+            )
+        diff = PatchedRecursiveDiffer(current, new_config, ignore_missing_keys=True)
+        changed = diff.changed()
+        added = diff.added()
+
+        if not added and not changed:
+            ret["result"] = False
+            ret["comment"] = "Configuration is already imported, but not functional."
+        elif __opts__["test"]:
+            ret["result"] = None
+            ret["comment"] = "Configuration would have been updated."
+            ret["changes"] = {"added": added, "changed": changed}
+        elif __salt__["nextcloud_server.config_import_raw"](
+            new_config, webroot=webroot, webuser=webuser
+        ):
+            ret["comment"] = "Configuration has been updated."
+            ret["changes"] = {"added": added, "changed": changed}
+        else:
+            # this should not hit, errors are raised
+            ret["result"] = False
+            ret["comment"] = "Something went wrong while importing Nextcloud config."
+    except (SaltInvocationError, CommandExecutionError) as e:
+        ret["result"] = False
+        ret["comment"] = str(e)
+
+    return ret
 
 
 def installed(
@@ -122,7 +270,9 @@ def installed(
 
     try:
         try:
-            if __salt__["nextcloud_server.is_installed"](raise_error=True, webroot=webroot, webuser=webuser):
+            if __salt__["nextcloud_server.is_installed"](
+                raise_error=True, webroot=webroot, webuser=webuser
+            ):
                 ret["comment"] = "Nextcloud installation is already finished."
                 return ret
         except CommandExecutionError as err:
@@ -139,14 +289,22 @@ def installed(
         ret["comment"] = f"Nextcloud has been {verb}ed."
         if verb == "reinstall":
             config = {}
-            for conf, val in (("dbtype", database), ("dbname", database_name), ("dbhost", database_host), ("dbuser", database_user), ("dbuser", database_user)):
+            for conf, val in (
+                ("dbtype", database),
+                ("dbname", database_name),
+                ("dbhost", database_host),
+                ("dbuser", database_user),
+                ("dbuser", database_user),
+            ):
                 if val:
                     config[conf] = val
             if database_pass:
                 config["dbpassword"] = database_pass
             elif database_pass_pillar:
                 config["dbpassword"] = __salt__["pillar.get"](database_pass_pillar)
-            __salt__["nextcloud_server.config_import_raw"](config, webroot=webroot, webuser=webuser)
+            __salt__["nextcloud_server.config_import_raw"](
+                config, webroot=webroot, webuser=webuser
+            )
         elif verb == "install":
             __salt__["nextcloud_server.install"](
                 database=database,
@@ -166,7 +324,9 @@ def installed(
         else:
             # this should never hit because errors are raised
             ret["result"] = False
-            ret["comment"] = f"Internal error: unknown operation `{verb}`. This is a bug."
+            ret[
+                "comment"
+            ] = f"Internal error: unknown operation `{verb}`. This is a bug."
             ret["changes"] = {}
     except (SaltInvocationError, CommandExecutionError) as err:
         ret["result"] = False

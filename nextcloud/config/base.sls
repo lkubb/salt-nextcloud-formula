@@ -8,7 +8,7 @@
 include:
   - {{ sls_package_install }}
 
-{%- if "web" == nextcloud.setup_method %}
+{%- if nextcloud.setup_method == "web" %}
 
 Nextcloud installation autoconfig is present:
   file.managed:
@@ -41,6 +41,62 @@ Nextcloud web installer needs to be run:
     - name: 'false'
     - onchanges:
       - Nextcloud installation autoconfig is present
+
+{%- elif nextcloud.setup_method == "raw" %}
+
+Nextcloud installation is initialized:
+  nextcloud_server.installed_raw:
+    - datadir: {{ nextcloud.lookup.datadir }}
+    - webroot: {{ nextcloud.lookup.webroot }}
+    - webuser: {{ nextcloud.lookup.user }}
+{%-   for param in [
+        "database",
+        "database_name",
+        "database_host",
+        "database_user",
+        "database_pass",
+        "instanceid",
+        "passwordsalt",
+        "secret",
+      ]
+%}
+    - {{ param }}: {{ nextcloud.setup_vars[param] }}
+{%-   endfor %}
+{%-   for param in ["dbtableprefix", "dbport"] %}
+{%-     if param in nextcloud.setup_vars %}
+    - {{ param }}: {{ nextcloud.setup_vars[param] }}
+{%-     endif %}
+{%-   endfor %}
+    - misc_config: {{ nextcloud.config.system | json }}
+
+Nextcloud datadir exists:
+  file.directory:
+    - name: {{ nextcloud.lookup.datadir }}
+    - user: {{ nextcloud.lookup.user }}
+    - group: {{ nextcloud.lookup.group }}
+    - mode: '0770'
+    - makedirs: true
+    - require_in:
+      - Nextcloud base setup is finished (checkpoint)
+
+Nextcloud datadir is marked:
+  file.managed:
+    - name: {{ nextcloud.lookup.datadir | path_join(".ocdata") }}
+    - contents: ''
+    - user: {{ nextcloud.lookup.user }}
+    - group: {{ nextcloud.lookup.group }}
+    - require:
+      - file: {{ nextcloud.lookup.datadir }}
+    - require_in:
+      - Nextcloud base setup is finished (checkpoint)
+
+Web installation is disabled:
+  file.absent:
+    - name: {{ nextcloud.lookup.webroot | path_join("config", "CAN_INSTALL") }}
+    - require:
+      - Nextcloud installation is initialized
+    - require_in:
+      - Nextcloud base setup is finished (checkpoint)
 
 {%- else %}
 

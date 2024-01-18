@@ -64,11 +64,21 @@ nextcloud:
     # state definition, not only includes, otherwise Salt will
     # refuse to require it.
   required_states_preinstall: []
-    # [cli, web]
+    # [cli, web, raw]
     # Automatically setup Nextcloud using the CLI tool ``occ``.
     # `web` will result in an autoconfig.php file, but you will
     # have to finish the installation manually and run the state
     # again after finishing.
+    # `raw` will do a raw config import and circumvent the installer.
+    # This is intended for cluster setups where you want to mirror
+    # the configuration, including `instanceid`, `passwordsalt`
+    # and `secret` configuration values.
+    # Please see the parameters for `installed_raw` in
+    # _states/nextcloud_server.py for details. You will need to
+    # provide them in `setup_vars` in addition to the ones found below.
+    # Note that currently, the `_pillar` variants will be ignored
+    # and no admin user will be created, so the initial installation
+    # should already have been performed on the database.
   setup_method: cli
     # Set values required for the initial installation.
   setup_vars:

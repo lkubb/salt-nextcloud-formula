@@ -235,7 +235,7 @@ def check(only_status=False, webroot=None, webuser=None):
     if only_status:
         return False
 
-    return out["stderr"]
+    return out["stdout"]
 
 
 def finish_upgrade(webroot=None, webuser=None):
@@ -648,6 +648,31 @@ def version(webroot=None, webuser=None):
     out = occ("--version", json=False, webroot=webroot, webuser=webuser)
 
     return out["stdout"].split(" ")[1]
+
+
+def version_raw(webroot=None, webuser=None):
+    """
+    Return the installed Nextcloud version. Uses information from the
+    `version.php` file directly instead of relying on a functional `occ` command.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' nextcloud_server.version_raw
+
+    webroot
+        The path where Nextcloud is installed. Defaults to
+        minion config value ``nextcloud_server.webroot``
+        or ``/var/www/nextcloud``.
+
+    webuser
+        The web user account running Nextcloud, usually ``www-data``, ``apache``.
+        Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
+    """
+    cmd = f"require_once('{webroot or web_root}/version.php'); "
+    cmd += "echo json_encode(implode('.', $OC_Version));"
+    return _php(cmd, webroot=webroot, webuser=webuser)
 
 
 def app_disable(app, webroot=None, webuser=None):
@@ -1174,7 +1199,8 @@ def config_import(config, webroot=None, webuser=None):
         try:
             cur_version = version(webroot=webroot, webuser=webuser)
         except CommandExecutionError:
-            cur_version = _php(f'require("{webroot or web_root}/version.php"); echo json_encode($OC_VersionString);', webuser=webuser)
+            cur_version = version_raw(webroot=webroot, webuser=webuser)
+
         fixed_version = packaging.version.parse("24.0.3")
 
         if packaging.version.parse(cur_version) < fixed_version:
@@ -1307,17 +1333,24 @@ def config_list_raw(config_file="config/config.php", webroot=None, webuser=None)
         The web user account running Nextcloud, usually ``www-data``, ``apache``.
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
     """
-    return (_php(f"require('{webroot or web_root}/{config_file}'); echo json_encode($CONFIG);"))
+    return _php(
+        f"require('{webroot or web_root}/{config_file}'); echo json_encode($CONFIG);",
+        webroot=webroot,
+        webuser=webuser,
+    )
 
 
-def config_import_raw(config, config_file="config/config.php", webroot=None, webuser=None):
+def config_import_raw(
+    config, config_file="config/config.php", webroot=None, webuser=None
+):
     """
-    Imports raw configuration. This is not intended for general usage, only to recover
-    from configuration errors that render the ``occ`` command unusable.
+    Imports raw configuration, skipping validation.
+    This is not intended for general usage, only to recover from configuration
+    errors that render the ``occ`` command unusable or for cluster setups.
 
     config
-        A mapping of config names to values to set. Supported value types are
-        string, int, float and bool.
+        A mapping of config names to values to set. This must be a dictionary,
+        which will be passed into a PHP script via JSON.
 
     config_file
         The file name to import and write, relative to ``webroot``. Defaults to ``config/config.php``.
@@ -1331,28 +1364,36 @@ def config_import_raw(config, config_file="config/config.php", webroot=None, web
         The web user account running Nextcloud, usually ``www-data``, ``apache``.
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
     """
-    cfg = "$newCfg = array();\n"
-    for conf, val in config.items():
-        cfg += f"$newCfg['{conf}'] = "
-        if isinstance(val, str):
-            cfg += f'"{val}"'
-        elif isinstance(val, bool):
-            cfg += str(val).lower()
-        elif isinstance(val, (int, float)):
-            cfg += str(val)
-        else:
-            raise CommandExecutionError("Cannot set composite values with raw import")
-        cfg += ";\n"
-    cmd = f"""
+    config_json = salt.utils.json.dumps(config)
+    # https://stackoverflow.com/questions/7696548/how-to-remove-empty-entries-of-an-array-recursively
+    cmd = """\
+function array_remove_empty($haystack)
+{
+    foreach ($haystack as $key => $value) {
+        if (is_array($value)) {
+            $haystack[$key] = array_remove_empty($haystack[$key]);
+        }
+
+        if (is_null($haystack[$key])) {
+            unset($haystack[$key]);
+        }
+    }
+
+    return $haystack;
+}
+"""
+    cmd += f"""
 $configFile = '{webroot or web_root}/{config_file}';
 require($configFile);
-{cfg}
-foreach ($newCfg as $conf => $val) {{
-    $CONFIG[$conf] = $val;
-}}
+$newCfgJson = <<<'JSONCONF'
+{config_json}
+JSONCONF;
+$newCfg = json_decode($newCfgJson, true);
+$mergedCfg = array_merge($CONFIG, $newCfg);
+$mergedCfg = array_remove_empty($mergedCfg);
 $content = "<?php\n";
 $content .= '$CONFIG = ';
-$content .= var_export($CONFIG, true);
+$content .= var_export($mergedCfg, true);
 $content .= ";\n";
 touch($configFile);
 chmod($configFile, 0640);
