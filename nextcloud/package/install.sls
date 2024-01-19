@@ -248,7 +248,7 @@ SELinux policies for Nextcloud are applied:
     - names:
       - {{ nextcloud.lookup.webroot }}
 {%-   for path, typ in nextcloud.selinux.policy.items() %}
-{%-     if typ is none or not not path.startswith("/") %}
+{%-     if typ is none or not path.startswith("/") %}
 {%-       continue %}
 {%-     endif %}
       - {{ path | json }}
