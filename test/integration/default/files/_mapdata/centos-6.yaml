@@ -51,6 +51,24 @@ values:
   groups_absent: []
   manage_groups_auto: true
   required_states_preinstall: []
+  selinux:
+    boolean:
+      httpd_can_connect_ldap: false
+      httpd_can_network_connect: false
+      httpd_can_network_connect_db: false
+      httpd_can_network_memcache: false
+      httpd_can_sendmail: false
+      httpd_unified: false
+      httpd_use_cifs: false
+      httpd_use_fusefs: false
+      httpd_use_gpg: false
+    policy:
+      .htaccess: httpd_sys_rw_content_t
+      .user.ini: httpd_sys_rw_content_t
+      3rdparty/aws/aws-sdk-php/src/data/logs(/.*)?: httpd_sys_rw_content_t
+      apps(/.*)?: httpd_sys_rw_content_t
+      config(/.*)?: httpd_sys_rw_content_t
+      data(/.*)?: httpd_sys_rw_content_t
   setup_method: cli
   setup_vars:
     admin_pass: correct horse battery staple

@@ -64,6 +64,44 @@ nextcloud:
     # state definition, not only includes, otherwise Salt will
     # refuse to require it.
   required_states_preinstall: []
+    # SELinux settings to apply when enabled.
+    # https://docs.nextcloud.com/server/latest/admin_manual/installation/selinux_configuration.html
+    # If you want to unset a default value, you can set
+    # its value to null and it will be ignored.
+  selinux:
+      # SELinux booleans
+    boolean:
+        # LDAP connections
+      httpd_can_connect_ldap: false
+        # Nextcloud requires access to remote networks for functions such as
+        # Server-to-Server sharing, external storages or the app store.
+      httpd_can_network_connect: false
+        # Remote database. Superfluous when httpd_can_network_connect
+      httpd_can_network_connect_db: false
+        # Remote memcache. Superfluous when httpd_can_network_connect
+      httpd_can_network_memcache: false
+        # E-mail notifications via sendmail
+      httpd_can_sendmail: false
+        # Allow writes to the whole web directory.
+        # Highly discouraged!
+      httpd_unified: false
+        # CIFS/SMB shares
+      httpd_use_cifs: false
+        # FuseFS mounts
+      httpd_use_fusefs: false
+        # rainloop webmail client
+      httpd_use_gpg: false
+      # SELinux policies for paths.
+      # Keys are patterns to match. If the pattern does not start with a `/`,
+      # the webroot from lookup:webroot will be prepended.
+      # Values are SELinux types to associate.
+    policy:
+      .htaccess: httpd_sys_rw_content_t
+      .user.ini: httpd_sys_rw_content_t
+      3rdparty/aws/aws-sdk-php/src/data/logs(/.*)?: httpd_sys_rw_content_t
+      apps(/.*)?: httpd_sys_rw_content_t
+      config(/.*)?: httpd_sys_rw_content_t
+      data(/.*)?: httpd_sys_rw_content_t
     # [cli, web, raw]
     # Automatically setup Nextcloud using the CLI tool ``occ``.
     # `web` will result in an autoconfig.php file, but you will

@@ -226,6 +226,35 @@ occ is executable for the web user:
     - require:
       - Nextcloud is extracted
 
+{%- if grains | traverse("selinux:enabled") %}
+
+SELinux policies for Nextcloud are present:
+  selinux.fcontext_policy_present:
+    - names:
+{%-   for path, typ in nextcloud.selinux.policy.items() %}
+{%-     if typ is none %}
+{%-       continue %}
+{%-     elif not path.startswith("/") %}
+{%-       set path = nextcloud.lookup.webroot | path_join(path) %}
+{%-     endif %}
+      - {{ path | json }}:
+        - sel_type: {{ typ }}
+{%-   endfor %}
+    - require:
+      - Nextcloud is extracted
+
+SELinux booleans for Nextcloud are managed:
+  selinux.boolean:
+    - names:
+{%-   for name, val in nextcloud.selinux.boolean.items() %}
+{%-     if val is none %}
+{%-       continue %}
+{%-     endif %}
+      - {{ name }}:
+        - value: {{ val | to_bool }}
+{%-   endfor %}
+{%- endif %}
+
 {%- if nextcloud.update_auto.enabled %}
 
 Nextcloud is up to date:

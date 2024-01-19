@@ -73,6 +73,27 @@
         "groups": {},
         "groups_absent": [],
         "manage_groups_auto": true,
+        "selinux": {
+          "boolean": {
+            "httpd_can_connect_ldap": false,
+            "httpd_can_network_memcache": false,
+            "httpd_can_network_connect_db": false,
+            "httpd_can_network_connect": false,
+            "httpd_can_sendmail": false,
+            "httpd_unified": false,
+            "httpd_use_cifs": false,
+            "httpd_use_fusefs": false,
+            "httpd_use_gpg": false
+          },
+          "policy": {
+            "data(/.*)?": "httpd_sys_rw_content_t",
+            "config(/.*)?": "httpd_sys_rw_content_t",
+            "apps(/.*)?": "httpd_sys_rw_content_t",
+            ".htaccess": "httpd_sys_rw_content_t",
+            ".user.ini": "httpd_sys_rw_content_t",
+            "3rdparty/aws/aws-sdk-php/src/data/logs(/.*)?": "httpd_sys_rw_content_t"
+          }
+        },
         "required_states_preinstall": [],
         "setup_vars": {
           "database": "sqlite",

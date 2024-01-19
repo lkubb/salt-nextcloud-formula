@@ -41,3 +41,29 @@ Nextcloud installation is absent:
 #}
 # This does not remove the user since usually,
 # it is the default user used by the http server.
+
+{%- if grains | traverse("selinux:enabled") %}
+
+SELinux policies for Nextcloud are absent:
+  selinux.fcontext_policy_absent:
+    - names:
+{%-   for path, typ in nextcloud.selinux.policy.items() %}
+{%-     if typ is none %}
+{%-       continue %}
+{%-     elif not path.startswith("/") %}
+{%-       set path = nextcloud.lookup.webroot | path_join(path) %}
+{%-     endif %}
+      - {{ path | json }}:
+{%-   endfor %}
+
+SELinux booleans for Nextcloud are managed:
+  selinux.boolean:
+    - names:
+{%-   for name, val in nextcloud.selinux.boolean.items() %}
+{%-     if val is none %}
+{%-       continue %}
+{%-     endif %}
+      - {{ name }}:
+        - value: false
+{%-   endfor %}
+{%- endif %}
