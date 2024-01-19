@@ -243,6 +243,20 @@ SELinux policies for Nextcloud are present:
     - require:
       - Nextcloud is extracted
 
+SELinux policies for Nextcloud are applied:
+  selinux.fcontext_policy_applied:
+    - names:
+      - {{ nextcloud.lookup.webroot }}
+{%-   for path, typ in nextcloud.selinux.policy.items() %}
+{%-     if typ is none or not not path.startswith("/") %}
+{%-       continue %}
+{%-     endif %}
+      - {{ path | json }}
+{%-   endfor %}
+    - recursive: true
+    - require:
+      - SELinux policies for Nextcloud are present
+
 SELinux booleans for Nextcloud are managed:
   selinux.boolean:
     - names:
