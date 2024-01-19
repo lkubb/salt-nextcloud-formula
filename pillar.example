@@ -99,7 +99,11 @@ nextcloud:
       .htaccess: httpd_sys_rw_content_t
       .user.ini: httpd_sys_rw_content_t
       3rdparty/aws/aws-sdk-php/src/data/logs(/.*)?: httpd_sys_rw_content_t
+      # This makes the app folder writable by the web UI. You might want
+      # to disable this.
       apps(/.*)?: httpd_sys_rw_content_t
+      # This makes the config folder writable by the web UI. You might want
+      # to disable this.
       config(/.*)?: httpd_sys_rw_content_t
       data(/.*)?: httpd_sys_rw_content_t
     # [cli, web, raw]
