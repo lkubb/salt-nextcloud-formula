@@ -1333,6 +1333,13 @@ def config_list_raw(config_file="config/config.php", webroot=None, webuser=None)
         The web user account running Nextcloud, usually ``www-data``, ``apache``.
         Defaults to minion config value ``nextcloud_server.user`` or ``www-data``.
     """
+    conf = Path(webroot or web_root) / config_file
+    if not conf.exists():
+        log.warning(f"Specified config file '{conf}' does not exist")
+        return {}
+    if not conf.read_text().strip():
+        log.warning(f"Specified config file '{conf}' is empty")
+        return {}
     return _php(
         f"require('{webroot or web_root}/{config_file}'); echo json_encode($CONFIG);",
         webroot=webroot,
@@ -1383,8 +1390,9 @@ function array_remove_empty($haystack)
 }
 """
     cmd += f"""
+$CONFIG = [];
 $configFile = '{webroot or web_root}/{config_file}';
-require($configFile);
+is_file($configFile) AND require($configFile);
 $newCfgJson = <<<'JSONCONF'
 {config_json}
 JSONCONF;
@@ -3894,7 +3902,12 @@ def _php(script, json=True, webroot=None, webuser=None, ensure_apc=None):
     )
     if out["retcode"] == 0:
         if json:
-            return salt.utils.json.loads(out["stdout"])
+            try:
+                return salt.utils.json.loads(out["stdout"])
+            except Exception as err:  # pylint: disable=broad-except
+                raise CommandExecutionError(
+                    f"Failed loading output: {err}\n\nOutput was:\n{out['stdout']}"
+                )
         return out["stdout"]
     raise CommandExecutionError(
         "Failed running php script '{}'.\nstderr: {}\nstdout: {}".format(
