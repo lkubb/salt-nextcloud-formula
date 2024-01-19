@@ -269,6 +269,20 @@ SELinux booleans for Nextcloud are managed:
 {%-   endfor %}
 {%- endif %}
 
+{%- set logfile = nextcloud.config.system.get("logfile", "nextcloud.log") %}
+{%- if not logfile.startswith("/") %}
+{%-   set logfile = nextcloud.lookup.datadir | path_join(logfile) %}
+{%- endif %}
+{%- if not logfile.startswith(nextcloud.lookup.datadir) %}
+
+Nextcloud log dest dir is present:
+  file.directory:
+    - name: {{ salt["file.dirname"](logfile) }}
+    # TODO make this configurable, hardcoded for now
+    - user: www-data
+    - group: www-data
+{%- endif %}
+
 {%- if nextcloud.update_auto.enabled %}
 
 Nextcloud is up to date:
