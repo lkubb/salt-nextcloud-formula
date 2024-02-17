@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/lkubb/salt-template-formula",
-  "commit": "9b606718e0a9bce02686a499fea4fbc927c8933d",
+  "commit": "77fb6850675fb0934ef3d23539dd34913772c525",
   "checkout": null,
   "context": {
     "cookiecutter": {
@@ -47,7 +47,11 @@
             "source_hash": "https://download.nextcloud.com/server/releases/latest-{version}.tar.bz2.sha512"
           }
         },
-        "formula_reqs": ["tar", "gpg", "bzip2"],
+        "formula_reqs": [
+          "tar",
+          "gpg",
+          "bzip2"
+        ],
         "gpg": {
           "fingerprint": "28806A878AE423A28372792ED75899B9A724937A",
           "keyid": "D75899B9A724937A",
