@@ -10,12 +10,6 @@
 {%-   set pkg_lookup, version = nextcloud.lookup.pkg.latest_major, nextcloud.version_major %}
 {%- endif %}
 
-{%- set tmp_base = salt["temp.dir"]() %}
-{%- set pkg_src = pkg_lookup.source.format(version=version) %}
-{%- set sig_src = pkg_lookup.sig.format(version=version) %}
-{%- set tmp_pkg = tmp_base | path_join(salt["file.basename"](pkg_src)) %}
-{%- set tmp_sig = tmp_base | path_join(salt["file.basename"](sig_src)) %}
-
 {%- set is_installed =
         salt["file.file_exists"](nextcloud.lookup.webroot | path_join("occ")) and
         salt["nextcloud_server.is_installed"](webroot=nextcloud.lookup.webroot, webuser=nextcloud.lookup.user)
@@ -85,112 +79,27 @@ Salt can apply Nextcloud formula:
   pkg.installed:
     - pkgs: {{ nextcloud.lookup.formula_reqs | json }}
 
-Salt can manage gpg for Nextcloud:
-  cmd.run:
-    - name: gpg --list-keys
-    - unless:
-      - test -d /root/.gnupg
-    - require:
-      - Salt can apply Nextcloud formula
-
-Nextcloud signing key is present (from keyserver):
+Nextcloud signing key is present:
   gpg.present:
     - name: {{ nextcloud.lookup.gpg.fingerprint[-16:] }}
     - keyserver: {{ nextcloud.lookup.gpg.keyserver }}
-    - require:
-      - Salt can manage gpg for Nextcloud
-
-Nextcloud signing key is present (fallback):
-  file.managed:
-    - name: /tmp/nextcloud.asc
     - source: {{ files_switch(
                     ["nextcloud.asc"],
                     config=nextcloud,
-                    lookup="Nextcloud signing key is present (fallback)",
+                    lookup="Nextcloud signing key is present",
                  )
               }}
-      - {{ nextcloud.lookup.gpg.official_src }}:
-        - skip_verify: true
-    - onfail:
-      - Nextcloud signing key is present (from keyserver)
+      - {{ nextcloud.lookup.gpg.official_src }}
     - require:
-      - Salt can manage gpg for Nextcloud
-  module.run:
-    - gpg.import_key:
-      - filename: /tmp/nextcloud.asc
-    - onfail:
-      - Nextcloud signing key is present (from keyserver)
-    - require:
-      - file: /tmp/nextcloud.asc
-
-{%- if "gpg" not in salt["saltutil.list_extmods"]().get("states", []) %}
-
-# Ensure the following does not run without the key being present.
-# The official gpg modules are currently big liars and always report
-# `Yup, no worries! Everything is fine.`
-Nextcloud gpg key is actually present:
-  module.run:
-    - gpg.get_key:
-      - fingerprint: {{ nextcloud.lookup.gpg.fingerprint }}
-    - require_in:
-      - Nextcloud is downloaded
-{%- endif %}
-
-Nextcloud is downloaded:
-  file.managed:
-    - names:
-      - {{ tmp_pkg }}:
-        - source: {{ pkg_src }}
-        - source_hash: {{ pkg_lookup.source_hash.format(version=version) }}
-      - {{ tmp_sig }}:
-        - source: {{ sig_src }}
-        - skip_verify: true
-{%- if not is_installed %}
-    - require:
-{%-   for req in nextcloud.required_states_preinstall %}
-      - sls: {{ req }}
-{%-   endfor %}
-{%- endif %}
-    # Do not overwrite existing Nextcloud installations.
-    # Upgrades should be done with included updater.
-    - unless:
-      - fun: file.file_exists
-        path: {{ nextcloud.lookup.webroot | path_join("occ") }}
-
-{%- if "gpg" not in salt["saltutil.list_extmods"]().get("states", []) %}
-
-Nextcloud signature is verified:
-  test.configurable_test_state:
-    - name: Check if the downloaded archive has been signed by the release signing key.
-    - changes: False
-    - result: >
-        __slot__:salt:gpg.verify(filename={{ tmp_pkg }},
-        signature={{ tmp_sig }}).res
-    - require:
-      - Nextcloud gpg key is actually present
-    - onchanges:
-      - Nextcloud is downloaded
-{%- else %}
-
-Nextcloud signature is verified:
-  gpg.verified:
-    - name: {{ tmp_pkg }}
-    - signature: {{ tmp_sig }}
-    - signed_by_any: {{ nextcloud.lookup.gpg.fingerprint }}
-    - onchanges:
-      - Nextcloud is downloaded
-{%- endif %}
-
-Nextcloud is removed if signature verification failed:
-  file.absent:
-    - name: {{ tmp_base }}
-    - onfail:
-      - Nextcloud signature is verified
+      - Salt can apply Nextcloud formula
 
 Nextcloud is extracted:
   archive.extracted:
     - name: {{ nextcloud.lookup.webroot }}
-    - source: {{ tmp_pkg }}
+    - source: {{ pkg_lookup.source.format(version=version) }}
+    - source_hash: {{ pkg_lookup.source_hash.format(version=version) }}
+    - signature: {{ pkg_lookup.sig.format(version=version) }}
+    - signed_by_any: {{ nextcloud.lookup.gpg.fingerprint | json }}
     - user: {{ nextcloud.lookup.user }}
     - group: {{ nextcloud.lookup.group }}
     # just dump the files
@@ -204,13 +113,7 @@ Nextcloud is extracted:
       - fun: file.file_exists
         path: {{ nextcloud.lookup.webroot | path_join("occ") }}
     - require:
-      - Salt can apply Nextcloud formula
-
-Nextcloud downloads are removed:
-  file.absent:
-    - name: {{ tmp_base }}
-    - onchanges:
-      - Nextcloud is extracted
+      - Nextcloud signing key is present
 
 Custom Nextcloud modules are synced:
   saltutil.sync_all:
