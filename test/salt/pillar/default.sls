@@ -85,7 +85,7 @@ nextcloud:
   users: {}
   users_absent: []
   version: latest
-  version_major: 24
+  version_major: 29
   web_install_use_defaults: false
 
   tofs:

@@ -172,7 +172,7 @@ nextcloud:
     # On the first installation, this version's latest release will
     # be installed.
     # Automatic updates are limited to this major version as well.
-  version_major: 24
+  version_major: 29
     # When choosing the web installer, you probably have a good reason
     # for it and do not want to be presented with default values
     # for unspecified values in `setup_vars`. You can enable that
