@@ -386,9 +386,24 @@ def uptodate(
     ret = {"name": name, "result": True, "comment": "", "changes": {}}
 
     try:
-        if __salt__["nextcloud_server.is_uptodate"](
-            max_version=max_version, webroot=webroot, webuser=webuser
-        ):
+        try:
+            is_uptodate = __salt__["nextcloud_server.is_uptodate"](
+                max_version=max_version, webroot=webroot, webuser=webuser
+            )
+        except CommandExecutionError as err:
+            if (
+                "Nextcloud or one of the apps require upgrade - only a limited number"
+                not in str(err)
+            ):
+                raise
+            __salt__["nextcloud_server.finish_upgrade"](
+                webroot=webroot, webuser=webuser
+            )
+            is_uptodate = __salt__["nextcloud_server.is_uptodate"](
+                max_version=max_version, webroot=webroot, webuser=webuser
+            )
+
+        if is_uptodate:
             ret["comment"] = "Nextcloud is already up to date."
             if max_version is not None:
                 ret[
@@ -408,26 +423,43 @@ def uptodate(
                 update_version
             )
             ret["changes"] = {"upgraded": update_version}
-        # @TODO this fails with NFS
-        # so, correct procedure would be:
-        # catch exceptions, check nextcloud_server.status
-        # if version is reported as new one, continue.
-        # then run nextcloud_server.finish_upgrade
-        elif __salt__["nextcloud_server.upgrade"](
-            no_backup=no_backup, ensure_apc=ensure_apc, webroot=webroot, webuser=webuser
-        ):
+            return ret
+
+        try:
+            if __salt__["nextcloud_server.upgrade"](
+                no_backup=no_backup,
+                ensure_apc=ensure_apc,
+                webroot=webroot,
+                webuser=webuser,
+            ):
+                ret["comment"] = "Nextcloud has been updated to version {}.".format(
+                    update_version
+                )
+                ret["changes"] = {"upgraded": update_version}
+            else:
+                # this should not hit, errors are raised
+                ret["result"] = False
+                ret[
+                    "comment"
+                ] = "Something went wrong while upgrading Nextcloud to version '{}'.".format(
+                    update_version
+                )
+        except CommandExecutionError:
+            # This fails with NFS, but the upgrade works.
+            # Just finish it in case the new version is reported.
+            curr_version = __salt__["nextcloud_server.status"](
+                webroot=webroot, webuser=webuser
+            )["versionstring"]
+            if curr_version != update_version:
+                raise
+            __salt__["nextcloud_server.finish_upgrade"](
+                webroot=webroot, webuser=webuser
+            )
             ret["comment"] = "Nextcloud has been updated to version {}.".format(
                 update_version
             )
             ret["changes"] = {"upgraded": update_version}
-        else:
-            # this should not hit, errors are raised
-            ret["result"] = False
-            ret[
-                "comment"
-            ] = "Something went wrong while upgrading Nextcloud to version '{}'.".format(
-                update_version
-            )
+
     except (SaltInvocationError, CommandExecutionError) as e:
         ret["result"] = False
         ret["comment"] = str(e)
