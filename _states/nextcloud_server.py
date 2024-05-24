@@ -10,9 +10,9 @@ import copy
 import logging
 from pathlib import Path
 
-import salt.utils.dictdiffer
 import salt.utils.json
 from salt.exceptions import CommandExecutionError, SaltInvocationError
+from salt.utils.dictdiffer import RecursiveDictDiffer
 
 log = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ def installed_raw(
             new_config["version"] = __salt__["nextcloud_server.version_raw"](
                 webroot=webroot, webuser=webuser
             )
-        diff = PatchedRecursiveDiffer(current, new_config, ignore_missing_keys=True)
+        diff = RecursiveDictDiffer(current, new_config, ignore_missing_keys=True)
         changed = diff.changed()
         added = diff.added()
 
@@ -916,7 +916,7 @@ def config_imported(name, config=None, force=False, webroot=None, webuser=None):
         current = __salt__["nextcloud_server.config_list"](
             "all", private=True, webroot=webroot, webuser=webuser
         )
-        diff = PatchedRecursiveDiffer(current, new_config, ignore_missing_keys=True)
+        diff = RecursiveDictDiffer(current, new_config, ignore_missing_keys=True)
         changed = diff.changed()
         added = diff.added()
 
@@ -1305,96 +1305,3 @@ def user_present(
         ret["comment"] += str(e)
 
     return ret
-
-
-class PatchedRecursiveDiffer(salt.utils.dictdiffer.RecursiveDictDiffer):
-    def added(self, include_nested=False, separator="."):
-        """
-        Returns all keys that have been added.
-
-        include_nested
-            If an added key contains a dictionary, include its
-            keys in dot notation as well. Defaults to false.
-
-        If the keys are in child dictionaries they will be represented with
-        . notation.
-
-        This works for added nested dicts as well, where the parent class
-        tries to access keys on non-dictionary values and throws an exception.
-        """
-        return sorted(self._it("old", "new", include_nested, separator=separator))
-
-    def removed(self, include_nested=False):
-        """
-        Returns all keys that have been removed.
-
-        include_nested
-            If an added key contains a dictionary, include its
-            keys in dot notation as well. Defaults to false.
-
-        If the keys are in child dictionaries they will be represented with
-        . notation
-
-        This works for removed nested dicts as well, where the parent class
-        tries to access keys on non-dictionary values and throws an exception.
-        """
-        return sorted(self._it("new", "old", include_nested))
-
-    def _it(
-        self,
-        key_a,
-        key_b,
-        include_nested=False,
-        diffs=None,
-        prefix="",
-        is_nested=False,
-        separator=".",
-    ):
-        keys = []
-        if diffs is None:
-            diffs = self.diffs
-
-        for key in diffs.keys():
-            if is_nested:
-                keys.append("{}{}".format(prefix, key))
-
-            if not isinstance(diffs[key], dict):
-                continue
-
-            if is_nested:
-                keys.extend(
-                    self._it(
-                        key_a,
-                        key_b,
-                        diffs=diffs[key],
-                        prefix="{}{}{}".format(prefix, key, separator),
-                        is_nested=is_nested,
-                        include_nested=include_nested,
-                    )
-                )
-            elif "old" not in diffs[key]:
-                keys.extend(
-                    self._it(
-                        key_a,
-                        key_b,
-                        diffs=diffs[key],
-                        prefix="{}{}{}".format(prefix, key, separator),
-                        is_nested=is_nested,
-                        include_nested=include_nested,
-                    )
-                )
-            elif diffs[key][key_a] == self.NONE_VALUE:
-                keys.append("{}{}".format(prefix, key))
-
-                if isinstance(diffs[key][key_b], dict) and include_nested:
-                    keys.extend(
-                        self._it(
-                            key_a,
-                            key_b,
-                            diffs=diffs[key][key_b],
-                            is_nested=True,
-                            prefix="{}{}{}".format(prefix, key, separator),
-                            include_nested=include_nested,
-                        )
-                    )
-        return keys
