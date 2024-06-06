@@ -992,7 +992,7 @@ def app_list_updates(allow_unstable=False, webroot=None, webuser=None):
         r"^([\S]+) new version available: ([\d\.]+)$", out["stdout"], re.MULTILINE
     )
 
-    return {app: version for res in updates for app, version in res}
+    return {app: version for app, version in updates}
 
 
 def config_app_delete(app, name, error_if_not_exists=False, webroot=None, webuser=None):
