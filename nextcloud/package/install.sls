@@ -177,13 +177,27 @@ SELinux booleans for Nextcloud are managed:
 {%-   set logfile = nextcloud.lookup.datadir | path_join(logfile) %}
 {%- endif %}
 {%- if not logfile.startswith(nextcloud.lookup.datadir) %}
+{%-   set logdir = salt["file.dirname"](logfile) %}
 
 Nextcloud log dest dir is present:
   file.directory:
-    - name: {{ salt["file.dirname"](logfile) }}
+    - name: {{ logdir }}
     # TODO make this configurable, hardcoded for now
     - user: www-data
     - group: www-data
+
+{%-   if grains | traverse("selinux:enabled") %}
+  selinux.fcontext_policy_present:
+    - name: {{ logdir ~ "(/.*)?" }}
+    - sel_type: httpd_log_t
+
+SELinux policy is applied for logdir:
+  selinux.fcontext_policy_applied:
+    - name: {{ logdir }}
+    - recursive: true
+    - require:
+      - Nextcloud log dest dir is present
+{%-   endif %}
 {%- endif %}
 
 {%- if nextcloud.update_auto.enabled %}
